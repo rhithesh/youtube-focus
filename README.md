@@ -79,9 +79,24 @@ options.*         goals, key, surfaces, thresholds, test call
 popup.*           on/off, per-page counts, errors
 test/validate.mjs offline schema + threshold checks (node test/validate.mjs)
 test/dom.html      real content.js against fake tiles (./test/run-dom.sh)
+icons/             see below
 ```
 
 Run both before trusting a change to masking or to the question rubrics.
+
+### Icons
+
+`icons/no_spam_badge.svg` is the supplied source lockup (badge + "No spam" wordmark,
+680x200). Manifest icons have to be square and the wordmark is unreadable at 16px, so
+`icon.svg` is a square derivative of just the badge glyph, keeping the source's exact
+colours (`#1D6FE0`, white) and proportions (circle r = 0.3125x height, stroke =
+0.0625x, corner radius = 0.25x).
+
+`icon-small.svg` is a chunkier variant used only for the 16px slot — scaled down from
+128, the 1px curved stroke antialiases to pale blue and the ring all but vanishes.
+
+`./icons/build.sh` rasterises both to `icon{16,32,48,128}.png` via headless Chrome.
+Re-run it after editing either SVG.
 
 ## Known limits
 
