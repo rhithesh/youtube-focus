@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --accent: #e551ba; }
+  body {
+    width: 268px; margin: 0; padding: 16px;
+    background: #0b0b0d; color: #e8e8ea;
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .name { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+  .switch { position: relative; width: 38px; height: 22px; flex: none; }
+  .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .track {
+    position: absolute; inset: 0; border-radius: 999px;
+    background: #2a2a30; transition: background .15s; pointer-events: none;
+  }
+  .track::after {
+    content: ""; position: absolute; top: 3px; left: 3px;
+    width: 16px; height: 16px; border-radius: 50%; background: #8b8b93; transition: transform .15s, background .15s;
+  }
+  .switch input:checked + .track { background: rgba(229,81,186,.3); }
+  .switch input:checked + .track::after { transform: translateX(16px); background: var(--accent); }
+
+  .stats { display: flex; gap: 8px; margin: 14px 0 12px; }
+  .stat { flex: 1; padding: 10px; background: #131316; border: 1px solid #26262b; border-radius: 9px; text-align: center; }
+  .stat b { display: block; font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: #8b8b93; }
+  .stat.blocked b { color: var(--accent); }
+
+  .goals { padding: 10px; background: #131316; border: 1px solid #26262b; border-radius: 9px; color: #8b8b93; font-size: 12px; max-height: 76px; overflow: hidden; }
+  .goals em { color: var(--accent); font-style: normal; }
+  .warn { margin-top: 10px; padding: 9px 10px; border-radius: 8px; background: rgba(255,107,74,.1); border: 1px solid rgba(255,107,74,.35); color: #ff9c82; font-size: 12px; }
+  button.link { display: block; width: 100%; margin-top: 12px; padding: 9px; background: #1d1d22; border: 1px solid #26262b; border-radius: 8px; color: #e8e8ea; font: inherit; font-weight: 550; cursor: pointer; }
+  button.link:hover { border-color: #444; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <span class="name">Feed Filter</span>
+    <label class="switch"><input id="enabled" type="checkbox"><span class="track"></span></label>
+  </div>
+
+  <div class="stats">
+    <div class="stat blocked"><b id="blocked">—</b><span>blocked here</span></div>
+    <div class="stat"><b id="judged">—</b><span>judged</span></div>
+  </div>
+
+  <div class="goals" id="goals">No goals set yet.</div>
+  <div class="warn" id="warn" hidden></div>
+
+  <button class="link" id="open">Settings &amp; goals</button>
+<script src="popup.js"></script>
+</body>
+</html>

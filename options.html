@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Feed Filter — settings</title>
+<link rel="stylesheet" href="options.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>Feed&nbsp;Filter</h1>
+    <p class="sub">YouTube listings are judged by <a href="https://docs.typesafe.ai" target="_blank" rel="noreferrer">TypeSafe&rsquo;s Jev</a>, a System One model that returns typed, calibrated decisions instead of text. Anything tagged goes black in your feed.</p>
+  </header>
+
+  <section id="welcome" hidden>
+    <h2>First things first: what are you here for?</h2>
+    <p>Everything below hinges on this. Write it in plain language &mdash; the model reads it the way a person would.</p>
+  </section>
+
+  <section>
+    <h2>1 &middot; Your goals</h2>
+    <label class="field">
+      <span class="label">What do you actually want out of YouTube?</span>
+      <textarea id="goals" rows="7" placeholder="e.g. I'm learning systems programming and want to go deep on Rust, databases and distributed systems. I also follow AI research seriously — papers and real implementations, not commentary. Outside that I want strength training and cooking. I do NOT want tech drama, reaction videos, productivity hustle content, news-of-the-week, or gaming."></textarea>
+      <span class="hint">Say what you want <em>and</em> what you don&rsquo;t. Negatives are the strongest signal you can give it.</span>
+    </label>
+  </section>
+
+  <section>
+    <h2>2 &middot; API access</h2>
+    <div class="row">
+      <label class="field">
+        <span class="label">Provider</span>
+        <select id="provider">
+          <option value="openrouter">OpenRouter &mdash; openrouter.ai/api/v1/systemone</option>
+          <option value="typesafe">TypeSafe direct &mdash; api.typesafe.ai/v1/systemone</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="label">Model</span>
+        <input id="model" type="text" spellcheck="false" placeholder="jev-latest">
+      </label>
+    </div>
+    <label class="field">
+      <span class="label">API key</span>
+      <input id="apiKey" type="password" spellcheck="false" autocomplete="off" placeholder="sk-or-v1-…">
+      <span class="hint">Stored in this browser only (<code>chrome.storage.local</code>) and sent to the provider endpoint, nowhere else. Input is billed at $0.042 / Mtok; output is free. A full feed page costs a fraction of a cent.</span>
+    </label>
+    <div class="row">
+      <button id="test" class="btn">Run a test call</button>
+      <label class="check"><input id="fallbackHeuristics" type="checkbox"> Use keyword heuristics when no key is set</label>
+    </div>
+    <pre id="testOut" hidden></pre>
+  </section>
+
+  <section>
+    <h2>3 &middot; Where to filter</h2>
+    <div class="grid">
+      <label class="check"><input type="checkbox" data-surface="home"> Home feed</label>
+      <label class="check"><input type="checkbox" data-surface="search"> Search results</label>
+      <label class="check"><input type="checkbox" data-surface="sidebar"> Watch-next sidebar</label>
+      <label class="check"><input type="checkbox" data-surface="shorts"> Shorts</label>
+    </div>
+    <label class="check block"><input id="hideUntilChecked" type="checkbox"> Black out every tile until it has been judged <span class="hint inline">(no flash of clickbait, but the feed fills in a beat slower)</span></label>
+  </section>
+
+  <section>
+    <h2>4 &middot; How strict</h2>
+
+    <label class="field slider">
+      <span class="label">Clickbait <output id="baitOut"></output><span class="scale">0 plain &rarr; 3 pure bait</span></span>
+      <input id="baitThreshold" type="range" min="0.5" max="3" step="0.1">
+      <span class="hint">Block when the clickbait score reaches this. Lower = stricter.</span>
+    </label>
+
+    <label class="field slider">
+      <span class="label">Off-goal <output id="offGoalOut"></output><span class="scale">0 on-target &rarr; 3 unrelated</span></span>
+      <input id="offGoalThreshold" type="range" min="0.5" max="3" step="0.1">
+      <span class="hint">Block when a video is this far from your goals. Only applies once you&rsquo;ve written goals above.</span>
+    </label>
+
+    <label class="field slider">
+      <span class="label">Spam <output id="junkOut"></output><span class="scale">probability</span></span>
+      <input id="junkThreshold" type="range" min="0.3" max="0.99" step="0.01">
+      <span class="hint">Block when the model puts at least this much probability on &ldquo;this is spam or scam or slop&rdquo;.</span>
+    </label>
+
+    <label class="field slider">
+      <span class="label">Minimum confidence <output id="confOut"></output><span class="scale">fail-open below this</span></span>
+      <input id="minConfidence" type="range" min="0" max="0.95" step="0.05">
+      <span class="hint">Jev reports how certain it is separately from the answer. Below this, a tile is left alone even if the score crosses the line &mdash; raise it if you&rsquo;re seeing false blocks.</span>
+    </label>
+  </section>
+
+  <footer>
+    <button id="save" class="btn btn--primary">Save</button>
+    <button id="clearCache" class="btn">Clear cached verdicts</button>
+    <span id="status" class="status"></span>
+  </footer>
+</main>
+<script src="options.js"></script>
+</body>
+</html>

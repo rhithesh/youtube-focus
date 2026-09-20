@@ -1,0 +1,146 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../content.css">
+<style>
+  body { margin:0; font-family: system-ui; background:#111; color:#eee; }
+  ytd-rich-item-renderer { display:block; width:320px; height:210px; margin:12px; background:#222; }
+  ytd-rich-item-renderer .thumb { display:block; width:320px; height:150px; background:#345; }
+  a { color:#8cf; text-decoration:none; }
+  #results { background:#000; padding:12px; font:13px ui-monospace,monospace; white-space:pre; }
+</style>
+<script>
+  // --- stub the extension APIs content.js expects -------------------------
+  const SETTINGS = {
+    enabled: true, provider: "openrouter", apiKey: "x", model: "jev-latest",
+    goals: "systems programming", onboarded: true,
+    surfaces: { home:true, search:true, sidebar:true, shorts:true },
+    baitThreshold: 2.0, offGoalThreshold: 2.6, junkThreshold: 0.85,
+    minConfidence: 0.5, hideUntilChecked: false, fallbackHeuristics: true,
+  };
+  const VERDICTS = {
+    aaaaaaaaaaa: { tag:"CLICK-BAIT", why:"bait 2.9/3 · 97% conf", scores:{}, source:"t" },
+    bbbbbbbbbbb: { tag:null, why:"", scores:{}, source:"t" },
+    ccccccccccc: { tag:"SPAM", why:"spam 95%", scores:{}, source:"t" },
+  };
+  window.chrome = {
+    runtime: {
+      lastError: null,
+      sendMessage(msg, cb) {
+        if (!cb) return;
+        if (msg.type === "settings") return void setTimeout(() => cb(SETTINGS), 0);
+        if (msg.type === "judge") {
+          const verdicts = {};
+          for (const v of msg.videos) verdicts[v.id] = VERDICTS[v.id] || { tag:null, why:"", scores:{} };
+          return void setTimeout(() => cb({ verdicts, settings: SETTINGS }), 0);
+        }
+        setTimeout(() => cb({}), 0);
+      },
+      onMessage: { addListener() {} },
+    },
+    storage: { onChanged: { addListener() {} } },
+  };
+</script>
+</head>
+<body>
+
+<div id="tiles">
+  <ytd-rich-item-renderer id="tileA">
+    <a id="thumbnail" href="/watch?v=aaaaaaaaaaa"><span class="thumb"></span></a>
+    <h3><a id="video-title-link" href="/watch?v=aaaaaaaaaaa"><span id="video-title">You WON'T BELIEVE this</span></a></h3>
+    <ytd-channel-name><a href="#">DramaDaily</a></ytd-channel-name>
+  </ytd-rich-item-renderer>
+
+  <ytd-rich-item-renderer id="tileB">
+    <a id="thumbnail" href="/watch?v=bbbbbbbbbbb"><span class="thumb"></span></a>
+    <h3><a id="video-title-link" href="/watch?v=bbbbbbbbbbb"><span id="video-title">Rust ownership explained</span></a></h3>
+    <ytd-channel-name><a href="#">Systems Weekly</a></ytd-channel-name>
+  </ytd-rich-item-renderer>
+
+  <ytd-rich-item-renderer id="tileC">
+    <a id="thumbnail" href="/watch?v=ccccccccccc"><span class="thumb"></span></a>
+    <h3><a id="video-title-link" href="/watch?v=ccccccccccc"><span id="video-title">FREE crypto airdrop bot</span></a></h3>
+    <ytd-channel-name><a href="#">Wealth Signals</a></ytd-channel-name>
+  </ytd-rich-item-renderer>
+</div>
+
+<pre id="results">running…</pre>
+
+<script src="../content.js"></script>
+<script>
+const log = [];
+let fails = 0;
+const ok = (c, m) => { log.push((c ? "  PASS  " : "  FAIL  ") + m); if (!c) fails++; };
+
+// Any real navigation attempt from a tile anchor gets recorded, not followed.
+let navigated = null;
+document.addEventListener("click", (e) => {
+  const a = e.target.closest && e.target.closest("a[href^='/watch']");
+  if (a) { navigated = a.getAttribute("href"); e.preventDefault(); }
+}, false);
+
+const click = (el) => el.dispatchEvent(new MouseEvent("click", { bubbles:true, cancelable:true, view:window }));
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+(async () => {
+  // ---- part 1: the event semantics, in isolation -----------------------
+  log.push("-- why it broke: stopPropagation() in the capture phase --");
+  const mk = (broken) => {
+    const host = document.createElement("div");
+    host.innerHTML = '<button class="b">x</button>';
+    const btn = host.querySelector(".b");
+    let fired = false;
+    if (broken) {
+      host.addEventListener("click", (e) => e.stopPropagation(), true);
+      btn.addEventListener("click", () => { fired = true; });
+    } else {
+      host.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (e.target.closest(".b")) fired = true;
+      }, true);
+    }
+    document.body.appendChild(host);
+    click(btn);
+    host.remove();
+    return fired;
+  };
+  ok(mk(true) === false, "old arrangement: button listener never fires (reproduces the bug)");
+  ok(mk(false) === true, "new arrangement: delegated capture handler fires");
+
+  // ---- part 2: the real content.js against real tiles -------------------
+  log.push("");
+  log.push("-- real content.js end to end --");
+  await sleep(1200);
+
+  const A = document.querySelector("#tileA"), B = document.querySelector("#tileB"), C = document.querySelector("#tileC");
+  ok(!!A.querySelector(".ygf-mask"), "clickbait tile is masked");
+  ok(A.querySelector(".ygf-mask__tag").textContent === "CLICK-BAIT", "mask shows the CLICK-BAIT tag");
+  ok(!B.querySelector(".ygf-mask"), "allowed tile is left alone");
+  ok(C.querySelector(".ygf-mask__tag").textContent === "SPAM", "spam tile shows the SPAM tag");
+
+  // clicking the mask body must swallow the click, not navigate
+  navigated = null;
+  click(C.querySelector(".ygf-mask"));
+  ok(navigated === null, "clicking the black area does not navigate to the video");
+  ok(!!C.querySelector(".ygf-mask"), "clicking the black area does not reveal it");
+
+  // the actual reported bug
+  navigated = null;
+  click(A.querySelector(".ygf-mask__reveal"));
+  await sleep(50);
+  ok(!A.querySelector(".ygf-mask"), "show anyway removes the mask");
+  ok(!!A.querySelector(".ygf-badge"), "show anyway leaves a corner badge");
+  ok(A.querySelector(".ygf-badge").textContent === "CLICK-BAIT", "badge keeps the tag");
+  ok(navigated === null, "show anyway does not navigate");
+  ok(getComputedStyle(A.querySelector(".ygf-badge")).pointerEvents === "none", "badge does not block the tile underneath");
+
+  // it must survive the rescan tick that recycles/repaints tiles
+  await sleep(1800);
+  ok(!A.querySelector(".ygf-mask"), "still revealed after a rescan tick");
+  ok(!!A.querySelector(".ygf-badge"), "badge survives a rescan tick");
+  ok(!!C.querySelector(".ygf-mask"), "other tiles stay masked");
+
+  log.push("");
+  log.push(fails ? fails + " FAILED" : "all " + (log.filter(l=>l.startsWith("  PASS")).length) + " checks passed");
+  document.getElementById("results").textContent = log.join("\n");
+})();
+</script>
+</body></html>
