@@ -1,7 +1,8 @@
 # Feed Filter — goal-aligned YouTube
 
-A Chrome extension that blacks out YouTube listings that are clickbait, spam, or
-irrelevant to goals you write yourself. Judgement comes from
+A Chrome extension that frosts over YouTube listings that are clickbait, spam, or
+irrelevant to goals you write yourself. Hover one and the blur lifts so you can read
+it and click through. Judgement comes from
 [TypeSafe's **Jev**](https://typesafe.ai/blog/introducing-system-one-models-and-jev),
 a System One model: you hand it state plus typed questions, and it hands back
 typed answers with calibrated probabilities instead of prose.
@@ -45,8 +46,18 @@ lower gate makes bait get tagged `SPAM`, which is the right call for the wrong
 reason. The displayed confidence is always the one belonging to the signal that
 decided — a `SPAM` verdict shows none, because nouls don't carry a confidence field.
 
-Blocked tiles go solid black with a tag (`CLICK-BAIT` / `SPAM` / `OFF-GOAL`) and the
-numbers behind it. **show anyway** reveals one, leaving a small corner badge.
+## What a blocked tile does
+
+A flagged tile gets a frosted veil (`backdrop-filter`, 80% strength = a 16px blur)
+and a corner chip carrying the tag — `CLICK-BAIT` in blue, `SPAM` in red, `OFF-GOAL`
+in slate — plus the numbers behind the call.
+
+Move the pointer onto it and the veil fades out over 0.18s and stops taking pointer
+events, so the thumbnail and title are readable and the click lands on YouTube's own
+link exactly as it normally would. Nothing is permanently dismissed and nothing is
+removed from the layout; the chip stays (dimmed) while you look, so you always know
+what was flagged. Blur strength is a slider in settings — drop it to 0 to keep the
+tags and lose the frosting entirely.
 
 ## Providers
 
@@ -78,11 +89,10 @@ content.css       the black tile
 options.*         goals, key, surfaces, thresholds, test call
 popup.*           on/off, per-page counts, errors
 test/validate.mjs offline schema + threshold checks (node test/validate.mjs)
-test/dom.html      real content.js against fake tiles (./test/run-dom.sh)
+test/browser.mjs   real content.js + real pointer input (node test/browser.mjs)
+test/dom.html      the fake-YouTube page browser.mjs drives
 icons/             see below
 ```
-
-Run both before trusting a change to masking or to the question rubrics.
 
 ### Icons
 
@@ -98,10 +108,17 @@ colours (`#1D6FE0`, white) and proportions (circle r = 0.3125x height, stroke =
 `./icons/build.sh` rasterises both to `icon{16,32,48,128}.png` via headless Chrome.
 Re-run it after editing either SVG.
 
+Run both before trusting a change to the veil behaviour or the question rubrics.
+`browser.mjs` talks to Chrome over CDP with no dependencies (Node 24's global
+`WebSocket`), dispatches a real `mouseMoved`, and leaves before/after screenshots in
+`/tmp/ygf-before.png` and `/tmp/ygf-after.png` so you can eyeball the blur.
+
 ## Known limits
 
 - Jev is text-only, so thumbnails are never examined — a clean title over a
   screaming thumbnail gets through.
+- Hover-to-clear needs a pointer. On a touchscreen there is no hover state, so a
+  tap goes straight through to the video.
 - Shorts are filtered as tiles in feeds and shelves. The immersive `/shorts/`
   swipe player is not covered.
 - YouTube's DOM shifts; selectors in `TILE_SELECTOR` and `extract()` may need

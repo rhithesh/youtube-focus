@@ -2,90 +2,75 @@
   position: relative !important;
 }
 
-.ygf-mask {
+/* The frosted veil. backdrop-filter blurs the tile underneath while leaving the
+   tag chip on top perfectly sharp. */
+.ygf-veil {
   position: absolute;
   inset: 0;
   z-index: 900;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px;
-  box-sizing: border-box;
-  background: #000;
-  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 12px;
-  color: #8a8a8a;
-  font-family: "Roboto", "Segoe UI", system-ui, sans-serif;
-  text-align: center;
-  overflow: hidden;
-  cursor: default;
-  pointer-events: auto;
-  user-select: none;
+  background: rgba(236, 243, 255, 0.42);
+  -webkit-backdrop-filter: blur(var(--ygf-blur, 16px)) saturate(0.5);
+  backdrop-filter: blur(var(--ygf-blur, 16px)) saturate(0.5);
+  transition: opacity 0.18s ease;
+  opacity: 1;
 }
 
-.ygf-mask__tag {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  line-height: 1.2;
-}
-
-.ygf-mask--clickbait .ygf-mask__tag { color: #e551ba; }
-.ygf-mask--spam .ygf-mask__tag { color: #ff6b4a; }
-.ygf-mask--offgoal .ygf-mask__tag { color: #6f7b8a; }
-.ygf-mask--pending .ygf-mask__tag { color: #4a4a4a; }
-
-.ygf-mask__why {
-  font-size: 11px;
-  line-height: 1.3;
-  color: #5c5c5c;
-  font-variant-numeric: tabular-nums;
-}
-
-.ygf-mask__reveal {
-  margin-top: 2px;
-  padding: 3px 10px;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 999px;
-  color: #9a9a9a;
-  font: inherit;
-  font-size: 11px;
-  line-height: 1.4;
-  cursor: pointer;
-}
-
-.ygf-mask__reveal:hover {
-  border-color: rgba(255, 255, 255, 0.5);
-  color: #fff;
-}
-
-/* Compact tiles (sidebar rows, dense shelves) drop everything but the tag. */
-.ygf-mask--tiny { gap: 3px; border-radius: 8px; }
-.ygf-mask--tiny .ygf-mask__tag { font-size: 10px; letter-spacing: 0.1em; }
-.ygf-mask--tiny .ygf-mask__why { display: none; }
-.ygf-mask--tiny .ygf-mask__reveal { padding: 1px 8px; font-size: 10px; }
-
-/* Left behind after "show anyway" so the tile stays labelled. */
-.ygf-badge {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  z-index: 900;
-  padding: 2px 6px;
-  background: rgba(0, 0, 0, 0.88);
-  border-radius: 4px;
-  color: #e551ba;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+/* Hovering anywhere on the tile clears the veil and lets the click through to
+   YouTube's own link. :hover sits on the tile, not the veil, so it stays put
+   once the veil stops taking pointer events. */
+.ygf-host:hover > .ygf-veil {
+  opacity: 0;
   pointer-events: none;
 }
 
-.ygf-badge--spam { color: #ff6b4a; }
-.ygf-badge--offgoal { color: #6f7b8a; }
+.ygf-chip {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 901;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: calc(100% - 12px);
+  padding: 4px 9px;
+  background: #1d6fe0;
+  border-radius: 8px;
+  color: #fff;
+  font-family: "Roboto", "Segoe UI", system-ui, sans-serif;
+  text-align: left;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+  user-select: none;
+}
+
+.ygf-chip--spam { background: #d93025; }
+.ygf-chip--offgoal { background: #5f6368; }
+.ygf-chip--pending { background: #9aa0a6; }
+
+/* Stays readable while previewing, just out of the way. */
+.ygf-host:hover > .ygf-chip { opacity: 0.55; }
+
+.ygf-chip__tag {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.ygf-chip__why {
+  font-size: 10px;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.85);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Compact tiles (sidebar rows, dense shelves) show the tag alone. */
+.ygf-chip--tiny { top: 4px; left: 4px; padding: 2px 6px; }
+.ygf-chip--tiny .ygf-chip__why { display: none; }

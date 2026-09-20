@@ -3,39 +3,39 @@
 <head>
 <meta charset="utf-8">
 <style>
-  :root { --accent: #e551ba; }
+  :root { --accent: #1d6fe0; --line: #dbe4f3; --panel: #f5f8fe; --muted: #5b6676; }
   body {
     width: 268px; margin: 0; padding: 16px;
-    background: #0b0b0d; color: #e8e8ea;
+    background: #fff; color: #161d29;
     font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   }
-  .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .top { display: flex; align-items: center; gap: 10px; }
   .logo { border-radius: 6px; flex: none; }
   .name { flex: 1; font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
   .switch { position: relative; width: 38px; height: 22px; flex: none; }
   .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
   .track {
     position: absolute; inset: 0; border-radius: 999px;
-    background: #2a2a30; transition: background .15s; pointer-events: none;
+    background: #d5dce8; transition: background .15s; pointer-events: none;
   }
   .track::after {
     content: ""; position: absolute; top: 3px; left: 3px;
-    width: 16px; height: 16px; border-radius: 50%; background: #8b8b93; transition: transform .15s, background .15s;
+    width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.28);
   }
-  .switch input:checked + .track { background: rgba(229,81,186,.3); }
-  .switch input:checked + .track::after { transform: translateX(16px); background: var(--accent); }
+  .switch input:checked + .track { background: var(--accent); }
+  .switch input:checked + .track::after { transform: translateX(16px); }
 
   .stats { display: flex; gap: 8px; margin: 14px 0 12px; }
-  .stat { flex: 1; padding: 10px; background: #131316; border: 1px solid #26262b; border-radius: 9px; text-align: center; }
+  .stat { flex: 1; padding: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; text-align: center; }
   .stat b { display: block; font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
-  .stat span { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: #8b8b93; }
+  .stat span { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .stat.blocked b { color: var(--accent); }
 
-  .goals { padding: 10px; background: #131316; border: 1px solid #26262b; border-radius: 9px; color: #8b8b93; font-size: 12px; max-height: 76px; overflow: hidden; }
-  .goals em { color: var(--accent); font-style: normal; }
-  .warn { margin-top: 10px; padding: 9px 10px; border-radius: 8px; background: rgba(255,107,74,.1); border: 1px solid rgba(255,107,74,.35); color: #ff9c82; font-size: 12px; }
-  button.link { display: block; width: 100%; margin-top: 12px; padding: 9px; background: #1d1d22; border: 1px solid #26262b; border-radius: 8px; color: #e8e8ea; font: inherit; font-weight: 550; cursor: pointer; }
-  button.link:hover { border-color: #444; }
+  .goals { padding: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; color: var(--muted); font-size: 12px; max-height: 76px; overflow: hidden; }
+  .warn { margin-top: 10px; padding: 9px 10px; border-radius: 8px; background: #fdecea; border: 1px solid #f5c3bd; color: #b3261e; font-size: 12px; }
+  button.link { display: block; width: 100%; margin-top: 12px; padding: 9px; background: #fff; border: 1px solid var(--line); border-radius: 8px; color: #161d29; font: inherit; font-weight: 550; cursor: pointer; }
+  button.link:hover { border-color: var(--accent); color: var(--accent); }
 </style>
 </head>
 <body>

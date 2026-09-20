@@ -7,6 +7,7 @@ const SLIDERS = {
   offGoalThreshold: { out: "#offGoalOut", fmt: (v) => Number(v).toFixed(1) + " / 3" },
   junkThreshold: { out: "#junkOut", fmt: (v) => Math.round(v * 100) + "%" },
   minConfidence: { out: "#confOut", fmt: (v) => Math.round(v * 100) + "%" },
+  blurStrength: { out: "#blurOut", fmt: (v) => Math.round(v) + "%  (" + Math.round(v * 0.2) + "px)" },
 };
 
 let settings = null;
@@ -92,7 +93,8 @@ $("#test").addEventListener("click", async () => {
     lines.push((r.tag ? "[" + r.tag + "]" : "[allowed] ") + "  " + r.title);
     lines.push(
       "    bait " + r.scores.bait + "/3   off-goal " + r.scores.goal + "/3   spam " +
-      Math.round(r.scores.junk * 100) + "%   confidence " + Math.round(r.scores.conf * 100) + "%"
+      Math.round(r.scores.junk * 100) + "%   confidence " +
+      (r.scores.conf == null ? "n/a (nouls carry none)" : Math.round(r.scores.conf * 100) + "%")
     );
     lines.push("");
   }

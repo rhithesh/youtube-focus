@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS = {
   junkThreshold: 0.85, // clickbait reads 0.45-0.75 on this question; real scams read 0.9+
   minConfidence: 0.5,
   hideUntilChecked: false,
+  blurStrength: 80, // percent; 100% renders as a 20px blur
   fallbackHeuristics: true,
 };
 

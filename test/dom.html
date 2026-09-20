@@ -1,20 +1,24 @@
 <!DOCTYPE html><html><head><meta charset="utf-8">
 <link rel="stylesheet" href="../content.css">
 <style>
-  body { margin:0; font-family: system-ui; background:#111; color:#eee; }
-  ytd-rich-item-renderer { display:block; width:320px; height:210px; margin:12px; background:#222; }
-  ytd-rich-item-renderer .thumb { display:block; width:320px; height:150px; background:#345; }
+  body { margin:0; font-family: system-ui; background:#0f0f0f; color:#eee; }
+  #tiles { display:flex; flex-wrap:wrap; }
+  ytd-rich-item-renderer { display:block; width:320px; height:210px; margin:12px; background:#181818; }
+  /* high-contrast stripes so a blur is visually obvious in screenshots */
+  .thumb { display:block; width:320px; height:150px;
+           background: repeating-linear-gradient(45deg,#0a2540 0 7px,#cfe3ff 7px 14px); }
+  h3 { margin:6px 8px 2px; font-size:14px; }
   a { color:#8cf; text-decoration:none; }
-  #results { background:#000; padding:12px; font:13px ui-monospace,monospace; white-space:pre; }
+  ytd-channel-name { display:block; margin:0 8px; font-size:12px; color:#aaa; }
+  #results { background:#000; padding:12px; margin:0; font:13px ui-monospace,monospace; white-space:pre; }
 </style>
 <script>
-  // --- stub the extension APIs content.js expects -------------------------
   const SETTINGS = {
     enabled: true, provider: "openrouter", apiKey: "x", model: "jev-latest",
     goals: "systems programming", onboarded: true,
     surfaces: { home:true, search:true, sidebar:true, shorts:true },
     baitThreshold: 2.0, offGoalThreshold: 2.6, junkThreshold: 0.85,
-    minConfidence: 0.5, hideUntilChecked: false, fallbackHeuristics: true,
+    minConfidence: 0.5, hideUntilChecked: false, blurStrength: 80, fallbackHeuristics: true,
   };
   const VERDICTS = {
     aaaaaaaaaaa: { tag:"CLICK-BAIT", why:"bait 2.9/3 · 97% conf", scores:{}, source:"t" },
@@ -41,106 +45,68 @@
 </script>
 </head>
 <body>
-
 <div id="tiles">
   <ytd-rich-item-renderer id="tileA">
     <a id="thumbnail" href="/watch?v=aaaaaaaaaaa"><span class="thumb"></span></a>
     <h3><a id="video-title-link" href="/watch?v=aaaaaaaaaaa"><span id="video-title">You WON'T BELIEVE this</span></a></h3>
     <ytd-channel-name><a href="#">DramaDaily</a></ytd-channel-name>
   </ytd-rich-item-renderer>
-
   <ytd-rich-item-renderer id="tileB">
     <a id="thumbnail" href="/watch?v=bbbbbbbbbbb"><span class="thumb"></span></a>
     <h3><a id="video-title-link" href="/watch?v=bbbbbbbbbbb"><span id="video-title">Rust ownership explained</span></a></h3>
     <ytd-channel-name><a href="#">Systems Weekly</a></ytd-channel-name>
   </ytd-rich-item-renderer>
-
   <ytd-rich-item-renderer id="tileC">
     <a id="thumbnail" href="/watch?v=ccccccccccc"><span class="thumb"></span></a>
     <h3><a id="video-title-link" href="/watch?v=ccccccccccc"><span id="video-title">FREE crypto airdrop bot</span></a></h3>
     <ytd-channel-name><a href="#">Wealth Signals</a></ytd-channel-name>
   </ytd-rich-item-renderer>
 </div>
-
 <pre id="results">running…</pre>
 
 <script src="../content.js"></script>
 <script>
-const log = [];
-let fails = 0;
-const ok = (c, m) => { log.push((c ? "  PASS  " : "  FAIL  ") + m); if (!c) fails++; };
-
-// Any real navigation attempt from a tile anchor gets recorded, not followed.
-let navigated = null;
+// Record navigation attempts instead of following them.
+window.__navigated = null;
 document.addEventListener("click", (e) => {
   const a = e.target.closest && e.target.closest("a[href^='/watch']");
-  if (a) { navigated = a.getAttribute("href"); e.preventDefault(); }
+  if (a) { window.__navigated = a.getAttribute("href"); e.preventDefault(); }
 }, false);
 
-const click = (el) => el.dispatchEvent(new MouseEvent("click", { bubbles:true, cancelable:true, view:window }));
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const log = []; let fails = 0;
+const ok = (c, m) => { log.push((c ? "  PASS  " : "  FAIL  ") + m); if (!c) fails++; };
+const css = (el, p) => getComputedStyle(el).getPropertyValue(p);
 
-(async () => {
-  // ---- part 1: the event semantics, in isolation -----------------------
-  log.push("-- why it broke: stopPropagation() in the capture phase --");
-  const mk = (broken) => {
-    const host = document.createElement("div");
-    host.innerHTML = '<button class="b">x</button>';
-    const btn = host.querySelector(".b");
-    let fired = false;
-    if (broken) {
-      host.addEventListener("click", (e) => e.stopPropagation(), true);
-      btn.addEventListener("click", () => { fired = true; });
-    } else {
-      host.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (e.target.closest(".b")) fired = true;
-      }, true);
-    }
-    document.body.appendChild(host);
-    click(btn);
-    host.remove();
-    return fired;
-  };
-  ok(mk(true) === false, "old arrangement: button listener never fires (reproduces the bug)");
-  ok(mk(false) === true, "new arrangement: delegated capture handler fires");
-
-  // ---- part 2: the real content.js against real tiles -------------------
-  log.push("");
-  log.push("-- real content.js end to end --");
-  await sleep(1200);
-
+window.__ready = (async () => {
+  await new Promise(r => setTimeout(r, 1200));
   const A = document.querySelector("#tileA"), B = document.querySelector("#tileB"), C = document.querySelector("#tileC");
-  ok(!!A.querySelector(".ygf-mask"), "clickbait tile is masked");
-  ok(A.querySelector(".ygf-mask__tag").textContent === "CLICK-BAIT", "mask shows the CLICK-BAIT tag");
-  ok(!B.querySelector(".ygf-mask"), "allowed tile is left alone");
-  ok(C.querySelector(".ygf-mask__tag").textContent === "SPAM", "spam tile shows the SPAM tag");
 
-  // clicking the mask body must swallow the click, not navigate
-  navigated = null;
-  click(C.querySelector(".ygf-mask"));
-  ok(navigated === null, "clicking the black area does not navigate to the video");
-  ok(!!C.querySelector(".ygf-mask"), "clicking the black area does not reveal it");
+  ok(!!A.querySelector(".ygf-veil"), "flagged tile gets a veil");
+  ok(!B.querySelector(".ygf-veil"), "allowed tile is left alone");
+  ok(!B.classList.contains("ygf-host"), "allowed tile is not even marked");
+  ok(A.querySelector(".ygf-chip__tag").textContent === "CLICK-BAIT", "chip carries the CLICK-BAIT tag");
+  ok(C.querySelector(".ygf-chip__tag").textContent === "SPAM", "chip carries the SPAM tag");
+  ok(A.querySelector(".ygf-chip__why").textContent.includes("bait 2.9"), "chip carries the reason");
 
-  // the actual reported bug
-  navigated = null;
-  click(A.querySelector(".ygf-mask__reveal"));
-  await sleep(50);
-  ok(!A.querySelector(".ygf-mask"), "show anyway removes the mask");
-  ok(!!A.querySelector(".ygf-badge"), "show anyway leaves a corner badge");
-  ok(A.querySelector(".ygf-badge").textContent === "CLICK-BAIT", "badge keeps the tag");
-  ok(navigated === null, "show anyway does not navigate");
-  ok(getComputedStyle(A.querySelector(".ygf-badge")).pointerEvents === "none", "badge does not block the tile underneath");
+  const veil = A.querySelector(".ygf-veil");
+  const bf = css(veil, "backdrop-filter") || css(veil, "-webkit-backdrop-filter");
+  ok(bf.includes("blur(16px)"), "80% strength renders as blur(16px) — got " + bf);
+  ok(css(veil, "opacity") === "1", "veil is opaque before hover");
+  ok(css(A.querySelector(".ygf-chip"), "pointer-events") === "none", "chip never eats clicks");
 
-  // it must survive the rescan tick that recycles/repaints tiles
-  await sleep(1800);
-  ok(!A.querySelector(".ygf-mask"), "still revealed after a rescan tick");
-  ok(!!A.querySelector(".ygf-badge"), "badge survives a rescan tick");
-  ok(!!C.querySelector(".ygf-mask"), "other tiles stay masked");
-
-  log.push("");
-  log.push(fails ? fails + " FAILED" : "all " + (log.filter(l=>l.startsWith("  PASS")).length) + " checks passed");
   document.getElementById("results").textContent = log.join("\n");
+  return fails;
 })();
+
+window.__report = (extra) => {
+  const all = log.concat(extra || []);
+  const passed = all.filter(l => l.startsWith("  PASS")).length;
+  const failed = all.filter(l => l.startsWith("  FAIL")).length;
+  document.getElementById("results").textContent = all.join("\n") + "\n\n" +
+    (failed ? failed + " of " + (passed + failed) + " FAILED" : "all " + passed + " checks passed");
+  return failed;
+};
+window.__fail = (m) => { ok(false, m); };
+window.__ok = (c, m) => { ok(c, m); };
 </script>
 </body></html>

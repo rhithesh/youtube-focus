@@ -22,7 +22,6 @@
 
   const verdicts = new Map(); // videoId -> verdict
   const inFlight = new Set(); // videoId
-  const revealed = new Set(); // videoId, cleared on reload
   const pending = new Map(); // videoId -> listing payload
 
   let settings = null;
@@ -119,71 +118,48 @@
 
   /* --------------------------------------------------------------- masking */
 
-  function clearMask(el) {
+  function clearBlock(el) {
     if (!el.classList.contains("ygf-host")) return;
     el.classList.remove("ygf-host");
-    el.querySelector(":scope > .ygf-mask")?.remove();
-    el.querySelector(":scope > .ygf-badge")?.remove();
+    el.querySelector(":scope > .ygf-veil")?.remove();
+    el.querySelector(":scope > .ygf-chip")?.remove();
   }
 
-  function ensureHost(el) {
+  // The options slider is a percentage; 100% is a 20px blur.
+  function blurPx() {
+    const pct = Number(settings?.blurStrength ?? 80);
+    return Math.max(0, Math.round(pct * 0.2));
+  }
+
+  function applyBlock(el, verdict) {
     el.classList.add("ygf-host");
-  }
 
-  function applyMask(el, verdict, info) {
-    const tag = verdict.tag || "CHECKING";
-    let mask = el.querySelector(":scope > .ygf-mask");
-    if (!mask) {
-      mask = document.createElement("div");
-      mask.className = "ygf-mask";
-      mask.innerHTML =
-        '<span class="ygf-mask__tag"></span>' +
-        '<span class="ygf-mask__why"></span>' +
-        '<button type="button" class="ygf-mask__reveal">show anyway</button>';
-      // One capture-phase listener does both jobs. It has to: stopPropagation()
-      // during capture halts the event before it ever reaches the button, so a
-      // listener on the button itself would never fire. Delegate instead.
-      mask.addEventListener(
-        "click",
-        (e) => {
-          e.stopPropagation(); // never let the tile's own link navigate
-          if (!e.target.closest?.(".ygf-mask__reveal")) return;
-          e.preventDefault();
-          const id = mask.dataset.ygfId;
-          revealed.add(id);
-          clearMask(el);
-          addBadge(el, verdicts.get(id) || { tag: mask.dataset.ygfTag });
-        },
-        true
-      );
-      ensureHost(el);
-      el.appendChild(mask);
+    let veil = el.querySelector(":scope > .ygf-veil");
+    if (!veil) {
+      veil = document.createElement("div");
+      veil.className = "ygf-veil";
+      el.appendChild(veil);
+    }
+    veil.style.setProperty("--ygf-blur", blurPx() + "px");
+
+    let chip = el.querySelector(":scope > .ygf-chip");
+    if (!chip) {
+      chip = document.createElement("div");
+      chip.className = "ygf-chip";
+      chip.innerHTML = '<span class="ygf-chip__tag"></span><span class="ygf-chip__why"></span>';
+      el.appendChild(chip);
     }
 
-    // Read at click time, not from the closure — YouTube recycles these nodes.
-    mask.dataset.ygfId = info.id;
-    mask.dataset.ygfTag = verdict.tag || "";
-
     const sig = (verdict.tag || "pending") + "|" + (verdict.why || "");
-    if (mask.dataset.ygfSig === sig) return;
-    mask.dataset.ygfSig = sig;
+    if (chip.dataset.ygfSig === sig) return;
+    chip.dataset.ygfSig = sig;
 
     const variant = verdict.tag ? TAG_CLASS[verdict.tag] : "pending";
-    mask.className = "ygf-mask ygf-mask--" + variant;
-    if (el.getBoundingClientRect().height < 110) mask.classList.add("ygf-mask--tiny");
+    chip.className = "ygf-chip ygf-chip--" + variant;
+    if (el.getBoundingClientRect().height < 110) chip.classList.add("ygf-chip--tiny");
 
-    mask.querySelector(".ygf-mask__tag").textContent = tag;
-    mask.querySelector(".ygf-mask__why").textContent = verdict.why || "";
-    mask.querySelector(".ygf-mask__reveal").style.display = verdict.tag ? "" : "none";
-  }
-
-  function addBadge(el, verdict) {
-    if (el.querySelector(":scope > .ygf-badge")) return;
-    const badge = document.createElement("div");
-    badge.className = "ygf-badge ygf-badge--" + (TAG_CLASS[verdict.tag] || "clickbait");
-    badge.textContent = verdict.tag;
-    ensureHost(el);
-    el.appendChild(badge);
+    chip.querySelector(".ygf-chip__tag").textContent = verdict.tag || "CHECKING";
+    chip.querySelector(".ygf-chip__why").textContent = verdict.why || "";
   }
 
   /* ---------------------------------------------------------------- scanning */
@@ -201,34 +177,28 @@
 
       // YouTube recycles renderer nodes while scrolling; reset when the id changes.
       if (el.__ygfId !== info.id) {
-        clearMask(el);
+        clearBlock(el);
         el.__ygfId = info.id;
       }
 
-      if (!surfaceEnabled(info.surface) || revealed.has(info.id)) {
-        const seen = verdicts.get(info.id);
-        if (revealed.has(info.id) && seen?.tag && surfaceEnabled(info.surface)) {
-          el.querySelector(":scope > .ygf-mask")?.remove();
-          addBadge(el, seen);
-        } else {
-          clearMask(el);
-        }
+      if (!surfaceEnabled(info.surface)) {
+        clearBlock(el);
         continue;
       }
 
       const verdict = verdicts.get(info.id);
       if (verdict) {
         if (verdict.tag) {
-          applyMask(el, verdict, info);
+          applyBlock(el, verdict);
           blocked++;
         } else {
-          clearMask(el);
+          clearBlock(el);
         }
         continue;
       }
 
       if (!inFlight.has(info.id) && !pending.has(info.id)) pending.set(info.id, info);
-      if (settings.hideUntilChecked) applyMask(el, { tag: null, why: "" }, info);
+      if (settings.hideUntilChecked) applyBlock(el, { tag: null, why: "" });
     }
 
     blockedCount = blocked;
@@ -269,7 +239,7 @@
     pending.clear();
     inFlight.clear();
     for (const el of document.querySelectorAll(".ygf-host")) {
-      clearMask(el);
+      clearBlock(el);
       el.__ygfId = null;
     }
   }
