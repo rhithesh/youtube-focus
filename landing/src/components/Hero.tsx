@@ -11,7 +11,7 @@ export function Hero() {
       <div className="mx-auto max-w-6xl px-5">
         <Reveal>
           <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-            <span className="text-brand">01</span> · A Chrome extension, judged by Jev
+            <span className="text-brand">01</span> · A noise filter of a Chrome extension
           </p>
         </Reveal>
 
@@ -24,8 +24,8 @@ export function Hero() {
         <div className="mt-10 flex flex-col justify-between gap-8 border-t border-line pt-8 md:flex-row md:items-end">
           <Reveal delay={0.15}>
             <p className="max-w-md text-[17px] leading-relaxed text-muted">
-              Feed Filter frosts over the clickbait, scams and off-goal noise on YouTube —
-              judged against goals <span className="text-ink">you</span> write yourself.
+              It is time to lock in
+              <span className="text-ink">you decide what to let in</span> write yourself.
               Hover to peek. Nothing is ever deleted.
             </p>
           </Reveal>

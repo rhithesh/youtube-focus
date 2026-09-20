@@ -17,9 +17,9 @@ export default function Home() {
         <Hero />
         <Strip />
         <Demo />
-        <Signals />
-        <Features />
-        <Cost />
+        {/*<Signals />*/}
+        {/*<Features />*/}
+        {/*<Cost />*/}
         <Install />
         <FAQ />
         <FinalCTA />
