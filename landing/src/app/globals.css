@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
-  --font-display: var(--font-instrument), Georgia, serif;
+  --font-display: var(--font-archivo-black), var(--font-archivo), ui-sans-serif, sans-serif;
 
-  --color-paper: #fbfaf7;
+  --color-paper: #ffffff;
   --color-ink: #16181d;
   --color-muted: #6f6b63;
   --color-line: #e7e4dd;
@@ -14,7 +14,7 @@
 }
 
 :root {
-  --background: #fbfaf7;
+  --background: #ffffff;
   --foreground: #16181d;
 }
 
@@ -50,9 +50,19 @@ section[id] {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+}
+
+h1,
+h2,
+h3,
+h4,
+button,
+a {
+  font-weight: 800;
 }
 
 ::selection {

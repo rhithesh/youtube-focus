@@ -17,7 +17,7 @@ export function Hero() {
 
         <Reveal delay={0.08}>
           <h1 className="mt-6 max-w-4xl font-display text-[clamp(56px,9vw,118px)] leading-[0.92] tracking-[-0.01em]">
-            Your feed, <em className="text-brand">frosted.</em>
+            Your feed, <em className="text-brand"> <br></br>DE-TOXED.</em>
           </h1>
         </Reveal>
 

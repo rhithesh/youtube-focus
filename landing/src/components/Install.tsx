@@ -10,7 +10,7 @@ export function Install() {
         <div className="flex flex-col items-center border-t border-line pt-8 text-center">
           <Reveal>
             <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-              <span className="text-brand">06</span> · Install
+              <span className="text-brand">03</span> · Install
             </p>
             <h2 className="mt-5 font-display text-[clamp(56px,9vw,120px)] leading-[1.02] tracking-[-0.01em]">
               Download

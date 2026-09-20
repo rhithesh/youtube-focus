@@ -22,7 +22,7 @@ export default function Home() {
         {/*<Cost />*/}
         <Install />
         <FAQ />
-        <FinalCTA />
+        {/*<FinalCTA />*/}
       </main>
       <Footer />
     </div>

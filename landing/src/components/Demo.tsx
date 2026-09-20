@@ -80,14 +80,14 @@ const TILES: Tile[] = [
   {
     kind: "quote",
     span: 2,
-    variant: "dark",
-    label: "how it reads",
+    variant: "light",
+    label: "Jerry Sienfield",
     main: (
       <>
-        Your goals, <em className="text-brand">your</em> words — read against every listing on the page.
+        Get Better nothing else nothing else matters
       </>
     ),
-    sub: "20 listings · 60 questions · one request",
+    sub: "Comedian",
   },
   {
     kind: "capture",
@@ -214,10 +214,7 @@ function CaptureCard({ t }: { t: CaptureTile }) {
           draggable={false}
         />
       </div>
-      <div className="shrink-0 p-2.5">
-        <p className="text-[12.5px] font-semibold leading-snug">Blocked in a live session</p>
-        <p className="mt-0.5 font-mono text-[9.5px] text-muted">{t.why}</p>
-      </div>
+
     </div>
   );
 }

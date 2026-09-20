@@ -41,7 +41,7 @@ export function FAQ() {
       <div className="mx-auto max-w-6xl px-5">
         <Reveal>
           <SectionHead
-            n="07"
+            n="04"
             label="FAQ"
             title={
               <>
