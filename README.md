@@ -48,16 +48,15 @@ decided — a `SPAM` verdict shows none, because nouls don't carry a confidence 
 
 ## What a blocked tile does
 
-A flagged tile gets a frosted veil (`backdrop-filter`, 80% strength = a 16px blur)
-and a corner chip carrying the tag — `CLICK-BAIT` in blue, `SPAM` in red, `OFF-GOAL`
-in slate — plus the numbers behind the call.
+A flagged tile gets a frosted veil (`backdrop-filter`, 80% strength = a 16px blur).
+No label is shown — the blur itself is the signal, and a tag sitting on top of a
+video you haven't looked at yet doesn't tell you anything a title can't.
 
 Move the pointer onto it and the veil fades out over 0.18s and stops taking pointer
 events, so the thumbnail and title are readable and the click lands on YouTube's own
 link exactly as it normally would. Nothing is permanently dismissed and nothing is
-removed from the layout; the chip stays (dimmed) while you look, so you always know
-what was flagged. Blur strength is a slider in settings — drop it to 0 to keep the
-tags and lose the frosting entirely.
+removed from the layout. Blur strength is a slider in settings — drop it to 0 to
+turn the frosting off entirely.
 
 ## Providers
 

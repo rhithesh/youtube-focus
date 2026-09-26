@@ -27,6 +27,7 @@
   };
   window.chrome = {
     runtime: {
+      id: "test-extension-id",
       lastError: null,
       sendMessage(msg, cb) {
         if (!cb) return;
@@ -40,7 +41,36 @@
       },
       onMessage: { addListener() {} },
     },
-    storage: { onChanged: { addListener() {} } },
+    storage: {
+      local: {
+        set(patch) {
+          if (patch.settings) Object.assign(SETTINGS, patch.settings);
+          return Promise.resolve();
+        },
+      },
+      onChanged: {
+        _listeners: [],
+        addListener(fn) { this._listeners.push(fn); },
+      },
+    },
+  };
+
+  // Simulates what the real popup does: writes storage, which fires onChanged
+  // in every other extension context (background, content scripts).
+  window.__setEnabled = (v) => {
+    chrome.storage.local.set({ settings: { ...SETTINGS, enabled: v } });
+    for (const fn of chrome.storage.onChanged._listeners) fn({ settings: {} }, "local");
+  };
+
+  // Simulates the extension being reloaded/updated while this tab is still open:
+  // chrome.runtime.id disappears and touching chrome.runtime.lastError throws
+  // synchronously, exactly like real post-invalidation Chrome.
+  window.__invalidate = () => {
+    Object.defineProperty(chrome.runtime, "id", { configurable: true, get() { return undefined; } });
+    Object.defineProperty(chrome.runtime, "lastError", {
+      configurable: true,
+      get() { throw new Error("Extension context invalidated."); },
+    });
   };
 </script>
 </head>
@@ -82,17 +112,15 @@ window.__ready = (async () => {
   const A = document.querySelector("#tileA"), B = document.querySelector("#tileB"), C = document.querySelector("#tileC");
 
   ok(!!A.querySelector(".ygf-veil"), "flagged tile gets a veil");
+  ok(!!C.querySelector(".ygf-veil"), "spam tile gets a veil too");
   ok(!B.querySelector(".ygf-veil"), "allowed tile is left alone");
   ok(!B.classList.contains("ygf-host"), "allowed tile is not even marked");
-  ok(A.querySelector(".ygf-chip__tag").textContent === "CLICK-BAIT", "chip carries the CLICK-BAIT tag");
-  ok(C.querySelector(".ygf-chip__tag").textContent === "SPAM", "chip carries the SPAM tag");
-  ok(A.querySelector(".ygf-chip__why").textContent.includes("bait 2.9"), "chip carries the reason");
+  ok(!A.querySelector(".ygf-chip"), "no chip/badge is rendered on the veil");
 
   const veil = A.querySelector(".ygf-veil");
   const bf = css(veil, "backdrop-filter") || css(veil, "-webkit-backdrop-filter");
   ok(bf.includes("blur(16px)"), "80% strength renders as blur(16px) — got " + bf);
   ok(css(veil, "opacity") === "1", "veil is opaque before hover");
-  ok(css(A.querySelector(".ygf-chip"), "pointer-events") === "none", "chip never eats clicks");
 
   document.getElementById("results").textContent = log.join("\n");
   return fails;

@@ -2,51 +2,49 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  :root { --accent: #1d6fe0; --line: #dbe4f3; --panel: #f5f8fe; --muted: #5b6676; }
   body {
-    width: 268px; margin: 0; padding: 16px;
-    background: #fff; color: #161d29;
-    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    width: 260px; margin: 0; padding: 16px;
+    background: #fff; color: #000;
+    font: 13px/1.5 "Comfortaa", sans-serif;
   }
   .top { display: flex; align-items: center; gap: 10px; }
-  .logo { border-radius: 6px; flex: none; }
-  .name { flex: 1; font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
-  .switch { position: relative; width: 38px; height: 22px; flex: none; }
+  .name { flex: 1; font-size: 16px; font-weight: 700; }
+  .switch { position: relative; width: 36px; height: 20px; flex: none; }
   .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
   .track {
-    position: absolute; inset: 0; border-radius: 999px;
-    background: #d5dce8; transition: background .15s; pointer-events: none;
+    position: absolute; inset: 0; border: 1px solid #000;
+    background: #fff; pointer-events: none;
   }
   .track::after {
-    content: ""; position: absolute; top: 3px; left: 3px;
-    width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s;
-    box-shadow: 0 1px 3px rgba(0,0,0,.28);
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; background: #fff; border: 1px solid #000; transition: transform .1s;
   }
-  .switch input:checked + .track { background: var(--accent); }
-  .switch input:checked + .track::after { transform: translateX(16px); }
+  .switch input:checked + .track { background: #000; }
+  .switch input:checked + .track::after { transform: translateX(15px); background: #fff; }
 
   .stats { display: flex; gap: 8px; margin: 14px 0 12px; }
-  .stat { flex: 1; padding: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; text-align: center; }
-  .stat b { display: block; font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
-  .stat span { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
-  .stat.blocked b { color: var(--accent); }
+  .stat { flex: 1; padding: 10px; border: 1px solid #000; text-align: center; }
+  .stat b { display: block; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: #555; }
 
-  .goals { padding: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; color: var(--muted); font-size: 12px; max-height: 76px; overflow: hidden; }
-  .warn { margin-top: 10px; padding: 9px 10px; border-radius: 8px; background: #fdecea; border: 1px solid #f5c3bd; color: #b3261e; font-size: 12px; }
-  button.link { display: block; width: 100%; margin-top: 12px; padding: 9px; background: #fff; border: 1px solid var(--line); border-radius: 8px; color: #161d29; font: inherit; font-weight: 550; cursor: pointer; }
-  button.link:hover { border-color: var(--accent); color: var(--accent); }
+  .goals { padding: 10px; border: 1px solid #000; color: #000; font-size: 12px; max-height: 76px; overflow: hidden; }
+  .warn { margin-top: 10px; padding: 9px 10px; border: 1px solid #000; font-size: 12px; }
+  button.link { display: block; width: 100%; margin-top: 12px; padding: 9px; background: #fff; border: 1px solid #000; color: #000; font: inherit; font-weight: 700; cursor: pointer; }
+  button.link:hover { background: #000; color: #fff; }
 </style>
 </head>
 <body>
   <div class="top">
-    <img class="logo" src="icons/icon.svg" alt="" width="22" height="22">
     <span class="name">Feed Filter</span>
     <label class="switch"><input id="enabled" type="checkbox"><span class="track"></span></label>
   </div>
 
   <div class="stats">
-    <div class="stat blocked"><b id="blocked">—</b><span>blocked here</span></div>
+    <div class="stat"><b id="blocked">—</b><span>blocked here</span></div>
     <div class="stat"><b id="judged">—</b><span>judged</span></div>
   </div>
 

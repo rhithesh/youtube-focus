@@ -14,12 +14,6 @@
     "yt-lockup-view-model",
   ].join(",");
 
-  const TAG_CLASS = {
-    "CLICK-BAIT": "clickbait",
-    SPAM: "spam",
-    "OFF-GOAL": "offgoal",
-  };
-
   const verdicts = new Map(); // videoId -> verdict
   const inFlight = new Set(); // videoId
   const pending = new Map(); // videoId -> listing payload
@@ -28,6 +22,45 @@
   let flushTimer = null;
   let scanTimer = null;
   let blockedCount = 0;
+  let dead = false; // true once the extension is reloaded/updated out from under this tab
+  let observer = null;
+  let intervalId = null;
+
+  // After an extension reload, any chrome.runtime.* access here throws "Extension context invalidated".
+  function alive() {
+    try {
+      return !!chrome.runtime?.id;
+    } catch {
+      return false;
+    }
+  }
+
+  function die() {
+    if (dead) return;
+    dead = true;
+    clearTimeout(scanTimer);
+    clearTimeout(flushTimer);
+    if (intervalId) clearInterval(intervalId);
+    observer?.disconnect();
+    // Nothing can toggle this tab's blur off any more, so don't leave it behind.
+    resetAll();
+  }
+
+  function safeSend(msg, cb) {
+    if (dead || !alive()) { die(); return; }
+    try {
+      chrome.runtime.sendMessage(msg, (res) => {
+        try {
+          if (chrome.runtime.lastError || !res) { if (!alive()) die(); return; }
+          cb(res);
+        } catch {
+          die();
+        }
+      });
+    } catch {
+      die();
+    }
+  }
 
   /* ------------------------------------------------------------ extraction */
 
@@ -122,7 +155,6 @@
     if (!el.classList.contains("ygf-host")) return;
     el.classList.remove("ygf-host");
     el.querySelector(":scope > .ygf-veil")?.remove();
-    el.querySelector(":scope > .ygf-chip")?.remove();
   }
 
   // The options slider is a percentage; 100% is a 20px blur.
@@ -141,30 +173,13 @@
       el.appendChild(veil);
     }
     veil.style.setProperty("--ygf-blur", blurPx() + "px");
-
-    let chip = el.querySelector(":scope > .ygf-chip");
-    if (!chip) {
-      chip = document.createElement("div");
-      chip.className = "ygf-chip";
-      chip.innerHTML = '<span class="ygf-chip__tag"></span><span class="ygf-chip__why"></span>';
-      el.appendChild(chip);
-    }
-
-    const sig = (verdict.tag || "pending") + "|" + (verdict.why || "");
-    if (chip.dataset.ygfSig === sig) return;
-    chip.dataset.ygfSig = sig;
-
-    const variant = verdict.tag ? TAG_CLASS[verdict.tag] : "pending";
-    chip.className = "ygf-chip ygf-chip--" + variant;
-    if (el.getBoundingClientRect().height < 110) chip.classList.add("ygf-chip--tiny");
-
-    chip.querySelector(".ygf-chip__tag").textContent = verdict.tag || "CHECKING";
-    chip.querySelector(".ygf-chip__why").textContent = verdict.why || "";
   }
 
   /* ---------------------------------------------------------------- scanning */
 
   function scan() {
+    if (dead) return;
+    if (!alive()) { die(); return; }
     if (!settings || !settings.enabled) return;
 
     let blocked = 0;
@@ -206,26 +221,26 @@
   }
 
   function scheduleScan(delay = 250) {
+    if (dead) return;
     clearTimeout(scanTimer);
     scanTimer = setTimeout(scan, delay);
   }
 
   function scheduleFlush() {
-    if (flushTimer) return;
+    if (dead || flushTimer) return;
     flushTimer = setTimeout(flush, 400);
   }
 
   function flush() {
     flushTimer = null;
-    if (!pending.size) return;
+    if (dead || !pending.size) return;
 
     const batch = [...pending.values()];
     pending.clear();
     batch.forEach((v) => inFlight.add(v.id));
 
-    chrome.runtime.sendMessage({ type: "judge", videos: batch }, (res) => {
+    safeSend({ type: "judge", videos: batch }, (res) => {
       batch.forEach((v) => inFlight.delete(v.id));
-      if (chrome.runtime.lastError || !res) return;
       if (res.settings) settings = res.settings;
       for (const [id, v] of Object.entries(res.verdicts || {})) verdicts.set(id, v);
       scan();
@@ -245,17 +260,17 @@
   }
 
   function start() {
-    const observer = new MutationObserver(() => scheduleScan());
+    observer = new MutationObserver(() => scheduleScan());
     observer.observe(document.documentElement, { childList: true, subtree: true });
 
     // Safety net for virtualised lists that mutate outside the observed subtree.
-    setInterval(scan, 1500);
+    intervalId = setInterval(scan, 1500);
     window.addEventListener("yt-navigate-finish", () => scheduleScan(120));
     document.addEventListener("scroll", () => scheduleScan(300), { passive: true });
     scan();
   }
 
-  chrome.runtime.sendMessage({ type: "settings" }, (s) => {
+  safeSend({ type: "settings" }, (s) => {
     settings = s || { enabled: false };
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", start, { once: true });
@@ -264,20 +279,28 @@
     }
   });
 
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== "local" || !changes.settings) return;
-    chrome.runtime.sendMessage({ type: "settings" }, (s) => {
-      settings = s;
-      resetAll();
-      scan();
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (dead || area !== "local" || !changes.settings) return;
+      safeSend({ type: "settings" }, (s) => {
+        settings = s;
+        resetAll();
+        scan();
+      });
     });
-  });
+  } catch {
+    die();
+  }
 
-  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    if (msg?.type === "stats") {
-      sendResponse({ blocked: blockedCount, judged: verdicts.size });
-      return true;
-    }
-    return false;
-  });
+  try {
+    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+      if (msg?.type === "stats") {
+        sendResponse({ blocked: blockedCount, judged: verdicts.size });
+        return true;
+      }
+      return false;
+    });
+  } catch {
+    die();
+  }
 })();

@@ -1,11 +1,8 @@
 :root {
   --bg: #ffffff;
-  --panel: #f5f8fe;
-  --line: #dbe4f3;
-  --text: #161d29;
-  --muted: #5b6676;
-  --accent: #1d6fe0;
-  --accent-soft: #e8f0fd;
+  --line: #000000;
+  --text: #000000;
+  --muted: #555555;
 }
 
 * { box-sizing: border-box; }
@@ -15,46 +12,42 @@ body {
   padding: 40px 24px 80px;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.55 "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font: 14px/1.55 "Comfortaa", sans-serif;
 }
 
 main { max-width: 680px; margin: 0 auto; }
 
-.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-.brand img { border-radius: 9px; flex: none; }
-
 h1 {
   margin: 0;
-  font-size: 26px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  font-size: 24px;
+  font-weight: 700;
 }
 
 h2 {
   margin: 0 0 14px;
   font-size: 13px;
-  font-weight: 650;
-  letter-spacing: 0.08em;
+  font-weight: 700;
   text-transform: uppercase;
-  color: var(--muted);
+  letter-spacing: 0.04em;
+  color: var(--text);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
 }
 
 .sub { margin: 0 0 8px; color: var(--muted); }
-a { color: var(--accent); }
+a { color: var(--text); }
 
 section {
   margin-top: 22px;
   padding: 20px;
-  background: var(--panel);
+  background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 12px;
 }
 
 #welcome {
-  border-color: var(--accent);
-  background: linear-gradient(180deg, var(--accent-soft), transparent);
+  border-width: 2px;
 }
-#welcome h2 { color: var(--accent); text-transform: none; font-size: 16px; letter-spacing: 0; }
+#welcome h2 { text-transform: none; font-size: 16px; letter-spacing: 0; border-bottom: none; padding-bottom: 0; }
 #welcome p { margin: 0; color: var(--muted); }
 
 .field { display: block; margin-bottom: 16px; }
@@ -65,33 +58,32 @@ section {
   align-items: baseline;
   gap: 8px;
   margin-bottom: 6px;
-  font-weight: 550;
+  font-weight: 700;
 }
 
 .scale { margin-left: auto; font-size: 11px; color: var(--muted); font-weight: 400; }
 
 textarea, input[type="text"], input[type="password"], select {
   width: 100%;
-  padding: 10px 12px;
+  padding: 8px 10px;
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 0;
   color: var(--text);
   font: inherit;
   resize: vertical;
 }
 
 textarea:focus, input:focus, select:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  outline: 2px solid var(--text);
+  outline-offset: -1px;
 }
 
-input[type="range"] { width: 100%; accent-color: var(--accent); }
+input[type="range"] { width: 100%; accent-color: var(--text); }
 
 output {
   font-family: ui-monospace, Menlo, monospace;
-  color: var(--accent);
+  color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -105,21 +97,21 @@ output {
 
 .check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .check.block { margin-top: 14px; }
-.check input { accent-color: var(--accent); }
+.check input { accent-color: var(--text); }
 
 .btn {
-  padding: 9px 16px;
+  padding: 8px 16px;
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 0;
   color: var(--text);
   font: inherit;
-  font-weight: 550;
+  font-weight: 700;
   cursor: pointer;
 }
-.btn:hover { border-color: var(--accent); color: var(--accent); }
-.btn--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn--primary:hover { filter: brightness(1.08); color: #fff; }
+.btn:hover { background: #000; color: #fff; }
+.btn--primary { background: #000; border-color: #000; color: #fff; }
+.btn--primary:hover { background: #fff; color: #000; }
 
 footer {
   position: sticky;
@@ -129,22 +121,23 @@ footer {
   align-items: center;
   margin-top: 24px;
   padding: 16px 0;
-  background: linear-gradient(180deg, transparent, var(--bg) 35%);
+  background: var(--bg);
+  border-top: 1px solid var(--line);
 }
 
 .status { font-size: 13px; color: var(--muted); }
-.status.ok { color: #137333; }
-.status.err { color: #d93025; }
+.status.ok { color: #000; font-weight: 700; }
+.status.err { color: #000; font-weight: 700; text-decoration: underline; }
 
 pre {
   margin: 14px 0 0;
   padding: 14px;
   max-height: 320px;
   overflow: auto;
-  background: #0f1b2d;
-  color: #dce6f5;
-  border: 1px solid #0f1b2d;
-  border-radius: 8px;
+  background: #fff;
+  color: #000;
+  border: 1px solid var(--line);
+  border-radius: 0;
   font: 12px/1.6 ui-monospace, Menlo, monospace;
   white-space: pre-wrap;
   word-break: break-word;

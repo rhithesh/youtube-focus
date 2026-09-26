@@ -24,6 +24,7 @@ const chrome = spawn(CHROME, [
 
 let ws, nextId = 1;
 const waiters = new Map();
+const uncaught = [];
 
 function send(method, params = {}) {
   const id = nextId++;
@@ -61,6 +62,10 @@ try {
     if (m.id && waiters.has(m.id)) {
       const w = waiters.get(m.id); waiters.delete(m.id);
       m.error ? w.rej(new Error(m.error.message)) : w.res(m.result);
+      return;
+    }
+    if (m.method === "Runtime.exceptionThrown") {
+      uncaught.push(m.params.exceptionDetails.exception?.description || m.params.exceptionDetails.text);
     }
   };
 
@@ -77,12 +82,10 @@ try {
 
   const read = () => evaluate(`(() => {
     const v = document.querySelector("#tileA .ygf-veil");
-    const c = document.querySelector("#tileA .ygf-chip");
     const s = getComputedStyle(v);
     return {
       opacity: s.opacity,
       pointerEvents: s.pointerEvents,
-      chipOpacity: getComputedStyle(c).opacity,
       hovered: document.querySelector("#tileA").matches(":hover"),
       navigated: window.__navigated,
       topEl: (document.elementFromPoint(${rect.x}, ${rect.y}) || {}).className || "",
@@ -112,13 +115,54 @@ try {
     [after.opacity === "0", "on hover: veil fades to transparent (blur gone)"],
     [after.pointerEvents === "none", "on hover: veil stops taking pointer events"],
     [!after.topEl.includes("ygf-veil"), "on hover: the video link is topmost again"],
-    [Number(after.chipOpacity) > 0 && Number(after.chipOpacity) < 1, "on hover: tag chip stays visible but dims (" + after.chipOpacity + ")"],
     [clicked.navigated === "/watch?v=aaaaaaaaaaa", "clicking a hovered tile reaches the video link"],
   ];
 
+  // toggle the extension off the way the popup does (a storage write + onChanged)
+  // and confirm every veil actually clears, not just stops re-applying.
+  await evaluate("window.__setEnabled(false)");
+  await sleep(200);
+  const offState = await evaluate(`(() => ({
+    veils: document.querySelectorAll(".ygf-veil").length,
+    hosts: document.querySelectorAll(".ygf-host").length,
+  }))()`);
+
+  const toggleChecks = [
+    [offState.veils === 0, "turning the toggle off clears every veil — got " + offState.veils + " remaining"],
+    [offState.hosts === 0, "turning the toggle off clears the ygf-host marker — got " + offState.hosts + " remaining"],
+  ];
+
+  // Simulate the extension being reloaded/updated out from under this already-open
+  // tab, then feed it a brand-new tile so it tries (and fails) to reach the
+  // now-severed background. The old bug: this threw "Extension context
+  // invalidated" as an uncaught error instead of failing quietly.
+  await evaluate("window.__setEnabled(true)"); // back on, so the new tile is even attempted
+  await evaluate("window.__invalidate()");
+  await evaluate(`(() => {
+    const el = document.createElement("ytd-rich-item-renderer");
+    el.innerHTML =
+      '<a id="thumbnail" href="/watch?v=ddddddddddd"><span class="thumb"></span></a>' +
+      '<h3><a id="video-title-link" href="/watch?v=ddddddddddd"><span id="video-title">A video that appears after reload</span></a></h3>' +
+      '<ytd-channel-name><a href="#">Some Channel</a></ytd-channel-name>';
+    document.querySelector("#tiles").appendChild(el);
+  })()`);
+  await sleep(2200); // past the 1.5s safety-net interval + 400ms flush debounce
+
+  const orphanVeils = await evaluate(`document.querySelectorAll(".ygf-veil").length`);
+  const invalidationChecks = [
+    [uncaught.length === 0, "no uncaught errors after the extension is invalidated — got: " + JSON.stringify(uncaught)],
+    [orphanVeils === 0, "an orphaned tab clears its own blur — got " + orphanVeils + " veils left"],
+  ];
+
   const extra = ["", "-- real pointer input over CDP --",
-    ...checks.map(([c, m]) => (c ? "  PASS  " : "  FAIL  ") + m)];
+    ...checks.map(([c, m]) => (c ? "  PASS  " : "  FAIL  ") + m),
+    "", "-- toggling off --",
+    ...toggleChecks.map(([c, m]) => (c ? "  PASS  " : "  FAIL  ") + m),
+    "", "-- extension invalidated mid-session --",
+    ...invalidationChecks.map(([c, m]) => (c ? "  PASS  " : "  FAIL  ") + m)];
   for (const [c, m] of checks) if (!c) process.exitCode = 1;
+  for (const [c, m] of toggleChecks) if (!c) process.exitCode = 1;
+  for (const [c, m] of invalidationChecks) if (!c) process.exitCode = 1;
 
   const fails = await evaluate(`window.__report(${JSON.stringify(extra)})`);
   console.log(await evaluate(`document.getElementById("results").textContent`));
