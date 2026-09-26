@@ -1,54 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { motion, useMotionValueEvent, useScroll } from "motion/react";
+import { useState } from "react";
+import { btn, Logo } from "./ui";
 
-const links = [
-  { label: "Demo", href: "#demo" },
-  { label: "How it judges", href: "#how" },
-  { label: "Install", href: "#install" },
+const LINKS = [
+  { label: "Goals", href: "#goals" },
+  { label: "How it works", href: "#how" },
+  { label: "Where", href: "#where" },
   { label: "FAQ", href: "#faq" },
 ];
 
 export function Navbar() {
+  const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  useMotionValueEvent(scrollY, "change", (y) => setScrolled(y > 24));
 
   return (
-    <header
-      className={`fixed inset-x-0 top-0 z-50 border-b transition-colors duration-300 ${
-        scrolled ? "border-line bg-paper/90 backdrop-blur-md" : "border-transparent bg-transparent"
-      }`}
-    >
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-5">
-        <a href="#top" className="flex items-center gap-2.5">
-          <svg viewBox="0 0 32 32" className="size-5" aria-hidden>
-            <rect width="32" height="32" rx="7" fill="#1D6FE0" />
-            <path d="M16 7.5l7 2.6v5.4c0 4.4-3 8.3-7 9-4-.7-7-4.6-7-9v-5.4l7-2.6z" fill="none" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
-            <path d="M12.8 15.8l2.3 2.3 4.4-4.4" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span className="text-[14px] font-semibold tracking-tight">Feed Filter</span>
-          <span className="font-mono text-[11px] text-muted">v1.0.0</span>
+    <div className="fixed inset-x-0 top-3 z-50 px-3 sm:top-4">
+      <motion.header
+        className="mx-auto flex h-14 max-w-[1000px] items-center justify-between rounded-full pl-5 pr-2"
+        animate={{
+          backgroundColor: scrolled ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0)",
+          boxShadow: scrolled ? "0 10px 30px -14px rgba(22,21,15,0.28), inset 0 0 0 1px rgba(22,21,15,0.08)" : "0 0 0 0 rgba(22,21,15,0), inset 0 0 0 1px rgba(22,21,15,0)",
+        }}
+        transition={{ duration: 0.3 }}
+        style={{ backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" }}
+      >
+        <a href="#top" aria-label="Feed Filter, back to top">
+          <Logo className="text-[16px]" />
         </a>
-        <nav className="hidden items-center gap-6 md:flex">
-          {links.map((l) => (
-            <a key={l.href} href={l.href} className="text-[13.5px] text-muted transition-colors hover:text-ink">
+        <nav className="hidden items-center gap-1 md:flex">
+          {LINKS.map((l) => (
+            <a key={l.href} href={l.href} className="rounded-full px-3.5 py-2 text-[14px] text-muted transition-colors hover:bg-ink/5 hover:text-ink">
               {l.label}
             </a>
           ))}
         </nav>
-        <a
-          href="#install"
-          className="rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-brand"
-        >
-          Download
+        <a href="#install" className={`${btn.ink} px-4 py-2.5 text-[14px]`}>
+          Get it free
         </a>
-      </div>
-    </header>
+      </motion.header>
+    </div>
   );
 }

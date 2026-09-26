@@ -1,74 +1,239 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { ArrowDown } from "lucide-react";
-import { HERO_TILES, TileCard } from "./FeedTile";
-import { Reveal } from "./Reveal";
+import {
+  animate,
+  motion,
+  useAnimationFrame,
+  useInView,
+  useMotionValue,
+  useReducedMotion,
+  type MotionValue,
+} from "motion/react";
+import { useEffect, useRef, useState } from "react";
+import { HERO_GOAL, ITEMS, WALL, WALL_NOISE, WALL_TOTAL, isNoise } from "@/lib/feed";
+import { FeedCard } from "./FeedCard";
+import { btn, Glyph } from "./ui";
+
+const EASE = [0.2, 0.7, 0.2, 1] as const;
+const SPEEDS = [26, 20, 30, 22]; // px per second
+const COL_VISIBILITY = ["", "", "hidden md:block", "hidden lg:block"];
+
+/** One column of the wall, looping forever. Two copies stacked; we wrap at one copy's height. */
+function Column({ ids, index, on, speed }: { ids: string[]; index: number; on: boolean; speed: MotionValue<number> }) {
+  const copyRef = useRef<HTMLDivElement>(null);
+  const y = useMotionValue(0);
+  const dir = index % 2 === 0 ? -1 : 1;
+
+  useAnimationFrame((_, delta) => {
+    const h = copyRef.current?.offsetHeight ?? 0;
+    if (!h) return;
+    let next = y.get() + dir * SPEEDS[index] * speed.get() * (Math.min(delta, 64) / 1000);
+    if (next <= -h) next += h;
+    if (next > 0) next -= h;
+    y.set(next);
+  });
+
+  const copy = (n: number) => (
+    <div ref={n === 0 ? copyRef : undefined} aria-hidden={n === 1 || undefined} className="flex flex-col gap-4 pb-4">
+      {ids.map((id, row) => (
+        <FeedCard key={id + n} item={ITEMS[id]} blurred={on && isNoise(id)} delay={index * 0.12 + row * 0.07} />
+      ))}
+    </div>
+  );
+
+  return (
+    <div className={COL_VISIBILITY[index]}>
+      <motion.div style={{ y }} className="will-change-transform">
+        {copy(0)}
+        {copy(1)}
+      </motion.div>
+    </div>
+  );
+}
+
+function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      aria-label="Filter"
+      onClick={() => onChange(!on)}
+      className={`relative flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition-colors duration-300 ${on ? "bg-ink" : "bg-ink/15"}`}
+    >
+      <motion.span
+        className={`block size-5 rounded-full shadow ${on ? "bg-lime" : "bg-card"}`}
+        animate={{ x: on ? 20 : 0 }}
+        transition={{ type: "spring", stiffness: 600, damping: 34 }}
+      />
+    </button>
+  );
+}
+
+function Headline({ on }: { on: boolean }) {
+  const [peek, setPeek] = useState(false);
+  const blur = on && !peek;
+  const words = ["Your", "feeds,"];
+  return (
+    <h1 className="font-serif text-[clamp(58px,10.5vw,148px)] leading-[0.9] tracking-[-0.025em]">
+      {words.map((w, i) => (
+        <motion.span
+          key={w}
+          className="mr-[0.2em] inline-block"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.9, delay: 0.1 + i * 0.1, ease: EASE }}
+        >
+          {w}
+        </motion.span>
+      ))}
+      <br />
+      <motion.span
+        className="mr-[0.2em] inline-block"
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.9, delay: 0.3, ease: EASE }}
+      >
+        minus
+      </motion.span>
+      <motion.span
+        className="inline-block"
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.9, delay: 0.4, ease: EASE }}
+      >
+        the{" "}
+        <motion.span
+          className="inline-block cursor-help italic"
+          onHoverStart={() => setPeek(true)}
+          onHoverEnd={() => setPeek(false)}
+          animate={{ filter: blur ? "blur(0.07em)" : "blur(0em)", opacity: blur ? 0.6 : 1 }}
+          transition={{ duration: blur ? 0.9 : 0.25, ease: EASE }}
+        >
+          noise.
+        </motion.span>
+      </motion.span>
+    </h1>
+  );
+}
 
 export function Hero() {
+  const reduce = useReducedMotion();
+  const [on, setOn] = useState(false);
+  const touched = useRef(false);
+  const wallRef = useRef<HTMLDivElement>(null);
+  const inView = useInView(wallRef);
+  const speed = useMotionValue(1);
+  const [hovering, setHovering] = useState(false);
+
+  // Show the raw feed for a beat, then switch the filter on, like opening a tab with the extension installed.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!touched.current) setOn(true);
+    }, reduce ? 0 : 1600);
+    return () => clearTimeout(t);
+  }, [reduce]);
+
+  // Glide to a stop while the pointer is over the wall so a card can be peeked at; freeze off-screen.
+  useEffect(() => {
+    const target = reduce || !inView ? 0 : hovering ? 0 : 1;
+    const a = animate(speed, target, { duration: target ? 0.8 : 0.5, ease: "easeOut" });
+    return () => a.stop();
+  }, [hovering, inView, reduce, speed]);
+
+  const setFilter = (v: boolean) => {
+    touched.current = true;
+    setOn(v);
+  };
+
   return (
-    <section id="top" className="relative pt-32 sm:pt-40">
-      <div className="mx-auto max-w-6xl px-5">
-        <Reveal>
-          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-            <span className="text-brand">01</span> · A noise filter of a Chrome extension
-          </p>
-        </Reveal>
+    <section id="top" className="relative overflow-hidden pt-32 sm:pt-36">
+      <div className="mx-auto max-w-[1200px] px-5 text-center">
+        <motion.div
+          className="inline-flex items-center gap-2 rounded-full border border-ink/10 bg-card/70 px-3 py-1.5 text-[13px] text-muted"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <span className="flex gap-1">
+            <Glyph platform="youtube" className="size-4" />
+            <Glyph platform="x" className="size-4" />
+            <Glyph platform="linkedin" className="size-4" />
+          </span>
+          <span className="hidden sm:inline">A Chrome extension for YouTube, X and LinkedIn</span>
+          <span className="sm:hidden">For YouTube, X and LinkedIn</span>
+        </motion.div>
 
-        <Reveal delay={0.08}>
-          <h1 className="mt-6 max-w-4xl font-display text-[clamp(56px,9vw,118px)] leading-[0.92] tracking-[-0.01em]">
-            Your feed, <em className="text-brand"> <br></br>DE-TOXED.</em>
-          </h1>
-        </Reveal>
-
-        <div className="mt-10 flex flex-col justify-between gap-8 border-t border-line pt-8 md:flex-row md:items-end">
-          <Reveal delay={0.15}>
-            <p className="max-w-md text-[17px] leading-relaxed text-muted">
-              It is time to lock in
-              <span className="text-ink">you decide what to let in</span> write yourself.
-              Hover to peek. Nothing is ever deleted.
-            </p>
-          </Reveal>
-          <Reveal delay={0.22}>
-            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-              <motion.a
-                whileHover={{ y: -2 }}
-                href="#install"
-                className="rounded-lg bg-ink px-5 py-3 text-[14px] font-semibold text-white transition-colors hover:bg-brand"
-              >
-                Download the extension
-              </motion.a>
-              <a href="#demo" className="group inline-flex items-center gap-1.5 px-1 py-3 text-[14px] font-medium text-muted hover:text-ink">
-                See it judge
-                <ArrowDown className="size-3.5 transition-transform group-hover:translate-y-0.5" />
-              </a>
-            </div>
-          </Reveal>
+        <div className="mt-7">
+          <Headline on={on} />
         </div>
 
-        <Reveal delay={0.28}>
-          <div className="mt-12 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {HERO_TILES.map((t, i) => (
-              <motion.div
-                key={t.id}
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.07, duration: 0.6 }}
-              >
-                <TileCard
-                  t={t}
-                  frosted={i === 0 || i === 2}
-                  tag={i === 0 ? { tag: "SPAM", cls: "bg-spam", why: "" } : i === 2 ? { tag: "CLICK-BAIT", cls: "bg-brand", why: "" } : null}
-                />
-              </motion.div>
-            ))}
-          </div>
-          <p className="mt-4 font-mono text-[11.5px] text-muted">
-            one request judges the whole page — 20 listings · 60 questions · ~6.4k tokens · ~950ms · $0.00027
-          </p>
-        </Reveal>
+        <motion.p
+          className="mx-auto mt-7 max-w-[560px] text-[17px] leading-relaxed text-muted sm:text-[18px]"
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.55, ease: EASE }}
+        >
+          Write down what you&rsquo;re on these sites for. Feed Filter blurs the clickbait, the scams and
+          everything off-goal. Hover anything to see it anyway.
+        </motion.p>
+
+        <motion.div
+          className="mt-9 flex flex-wrap justify-center gap-3"
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.65, ease: EASE }}
+        >
+          <a href="#install" className={btn.ink}>
+            Add to Chrome, free
+            <span aria-hidden>→</span>
+          </a>
+          <a href="#how" className={btn.ghost}>
+            How it works
+          </a>
+        </motion.div>
       </div>
+
+      <motion.div
+        className="relative z-20 mx-auto mt-16 flex w-fit max-w-[calc(100%-2.5rem)] flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-[22px] border border-ink/10 bg-card px-4 py-3 shadow-[0_12px_40px_-16px_rgba(22,21,15,0.35)] sm:rounded-full sm:py-2.5 sm:pl-3"
+        initial={{ opacity: 0, y: 16, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.7, delay: 0.8, ease: EASE }}
+      >
+        <div className="flex items-center gap-3">
+          <Toggle on={on} onChange={setFilter} />
+          <span className="w-[74px] text-left text-[14px] font-medium">Filter {on ? "on" : "off"}</span>
+        </div>
+        <span className="hidden h-5 w-px bg-line sm:block" />
+        <span className="max-w-[340px] truncate text-[13px] text-muted" title={HERO_GOAL}>
+          Goal: <span className="text-ink">{HERO_GOAL}</span>
+        </span>
+        <span className="hidden h-5 w-px bg-line sm:block" />
+        <span className="text-[13px] tabular-nums text-muted" aria-live="polite">
+          <motion.span key={String(on)} className="inline-block font-medium text-ink" initial={{ y: 6, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+            {on ? WALL_NOISE : 0}
+          </motion.span>{" "}
+          of {WALL_TOTAL} blurred
+        </span>
+      </motion.div>
+
+      <motion.div
+        ref={wallRef}
+        className="wall-mask relative -mt-7 h-[620px] overflow-hidden sm:h-[700px]"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1, delay: 0.5 }}
+        onHoverStart={() => setHovering(true)}
+        onHoverEnd={() => setHovering(false)}
+      >
+        <div className="mx-auto grid max-w-[1320px] grid-cols-2 gap-3 px-3 pt-4 sm:gap-4 sm:px-5 md:grid-cols-3 lg:grid-cols-4">
+          {WALL.map((ids, i) => (
+            <Column key={i} ids={ids} index={i} on={on} speed={speed} />
+          ))}
+        </div>
+      </motion.div>
+      <p className="relative mx-auto -mt-6 max-w-[1200px] px-5 text-center text-[13px] text-muted">
+        Every blur above is the model&rsquo;s real verdict for that post. Hover the wall to stop it, then hover a card to peek.
+      </p>
     </section>
   );
 }

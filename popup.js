@@ -5,8 +5,9 @@ let settings = null;
 async function init() {
   settings = (await chrome.storage.local.get("settings")).settings || {};
   $("#enabled").checked = !!settings.enabled;
+  showState(!!settings.enabled);
 
-  $("#goals").textContent = settings.goals?.trim() || "No goals set yet — open settings and describe what you want out of YouTube.";
+  $("#goals").textContent = settings.goals?.trim() || "No goals set yet — open settings and describe what you want out of your feeds.";
 
   const { lastError } = await chrome.storage.local.get("lastError");
   if (!settings.apiKey) {
@@ -18,17 +19,21 @@ async function init() {
   }
 
   // tab.url is hidden without the "tabs" permission, so ask the tab directly;
-  // only a YouTube tab has a content script to answer.
+  // only a YouTube, X or LinkedIn tab has a content script to answer.
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return;
   chrome.tabs.sendMessage(tab.id, { type: "stats" }, (res) => {
     if (chrome.runtime.lastError || !res) {
-      show("Not filtering this tab. On YouTube? Reload the page.");
+      show("Not filtering this tab. On YouTube, X or LinkedIn? Reload the page.");
       return;
     }
     $("#blocked").textContent = res.blocked;
     $("#judged").textContent = res.judged;
   });
+}
+
+function showState(on) {
+  $("#state").innerHTML = on ? "Filter <em>on</em>" : "Filter <em>off</em>";
 }
 
 function show(msg) {
@@ -43,6 +48,7 @@ function show(msg) {
 $("#enabled").addEventListener("change", (e) => {
   settings.enabled = e.target.checked;
   chrome.storage.local.set({ settings });
+  showState(e.target.checked);
 });
 
 $("#open").addEventListener("click", () => chrome.runtime.openOptionsPage());

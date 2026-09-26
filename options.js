@@ -60,7 +60,7 @@ $("#save").addEventListener("click", async () => {
   settings = collect();
   await chrome.storage.local.set({ settings });
   $("#welcome").hidden = true;
-  status("Saved. Reload any open YouTube tab.", "ok");
+  status("Saved. Reload any open YouTube, X or LinkedIn tab.", "ok");
 });
 
 $("#clearCache").addEventListener("click", async () => {

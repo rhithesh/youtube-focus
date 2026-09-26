@@ -1,7 +1,7 @@
-# Feed Filter — goal-aligned YouTube
+# Feed Filter — goal-aligned feeds
 
-A Chrome extension that frosts over YouTube listings that are clickbait, spam, or
-irrelevant to goals you write yourself. Hover one and the blur lifts so you can read
+A Chrome extension that blurs YouTube videos, X posts and LinkedIn posts that are
+clickbait, spam, or irrelevant to goals you write yourself. Hover one and the blur lifts so you can read
 it and click through. Judgement comes from
 [TypeSafe's **Jev**](https://typesafe.ai/blog/introducing-system-one-models-and-jev),
 a System One model: you hand it state plus typed questions, and it hands back
@@ -12,31 +12,34 @@ typed answers with calibrated probabilities instead of prose.
 1. `chrome://extensions` → enable **Developer mode** → **Load unpacked** → pick this folder.
 2. The settings page opens on install. Write your goals, paste your API key, hit
    **Run a test call**, then **Save**.
-3. Reload any open YouTube tab.
+3. Reload any open YouTube, X or LinkedIn tab.
 
 ## How it judges
 
-Every listing in view is reduced to its text — title, channel, duration, view count,
-whether it's a Short — and a whole page of them goes out as **one** request to
+Every item in view is reduced to its text — for a video: title, channel, duration,
+views, whether it's a Short; for an X or LinkedIn post: the post text (first 700
+characters, emoji kept), author and engagement line — and a whole page of them goes
+out as **one** request to
 `POST /v1/systemone`. Jev reads the state once and answers every question against it
 in parallel, so a page costs one round trip.
 
 Measured against OpenRouter, 10 listings (30 questions, 6.4k input tokens) came back
 in **~950ms for $0.00027**. Output tokens are free. A 20-listing batch runs about
-$0.0005, so a heavy day of scrolling costs a few cents.
+$0.0005, so a heavy day of scrolling costs a few cents. A mixed batch of 10 X, LinkedIn
+and YouTube items measured 7.1k input tokens, ~1s and $0.0003.
 
-Each listing gets three questions:
+Each item gets three questions:
 
 | Key | Primitive | What it asks |
 | --- | --- | --- |
-| `vN_bait` | `score`, 4 levels | plain and accurate → pure engagement bait |
+| `vN_bait` | `score`, 4 levels | plain and accurate → pure engagement bait (incl. "Agree?" comment farming, broetry, rage-bait) |
 | `vN_goal` | `score`, 4 levels | directly advances your goals → unrelated distraction |
 | `vN_junk` | `noul` | probability this is spam, a scam, or mass-produced slop |
 
 Your code — not the model — decides what to do with those numbers. Thresholds live
 in settings, `SPAM` outranks `CLICK-BAIT` outranks `OFF-GOAL`, and every block is
 **confidence-gated**: Jev reports certainty separately from the answer, so a high
-score it isn't sure about leaves the tile alone. Raise *Minimum confidence* if you
+score it isn't sure about leaves the item alone. Raise *Minimum confidence* if you
 see false blocks; lower the score thresholds to get stricter.
 
 The spam threshold defaults to **0.85** rather than something lower, for a reason
@@ -46,9 +49,9 @@ lower gate makes bait get tagged `SPAM`, which is the right call for the wrong
 reason. The displayed confidence is always the one belonging to the signal that
 decided — a `SPAM` verdict shows none, because nouls don't carry a confidence field.
 
-## What a blocked tile does
+## What a blocked item does
 
-A flagged tile gets a frosted veil (`backdrop-filter`, 80% strength = a 16px blur).
+A flagged item gets a frosted veil (`backdrop-filter`, 80% strength = a 16px blur).
 No label is shown — the blur itself is the signal, and a tag sitting on top of a
 video you haven't looked at yet doesn't tell you anything a title can't.
 
@@ -83,13 +86,15 @@ invalidates itself. **Clear cached verdicts** in settings forces a re-judge.
 ```
 manifest.json     MV3 manifest
 background.js     batching, Jev calls, verdict logic, cache
-content.js        tile discovery, extraction, masking
-content.css       the black tile
+content.js        per-site adapters (YouTube, X, LinkedIn), extraction, blur
+content.css       the blur veil
 options.*         goals, key, surfaces, thresholds, test call
 popup.*           on/off, per-page counts, errors
 test/validate.mjs offline schema + threshold checks (node test/validate.mjs)
 test/browser.mjs   real content.js + real pointer input (node test/browser.mjs)
 test/dom.html      the fake-YouTube page browser.mjs drives
+test/e2e.mjs       real extension on fixture youtube.com / x.com / linkedin.com pages
+                   (node test/e2e.mjs; OPENROUTER_API_KEY=... for live Jev)
 icons/             see below
 ```
 
@@ -120,5 +125,9 @@ Run both before trusting a change to the veil behaviour or the question rubrics.
   tap goes straight through to the video.
 - Shorts are filtered as tiles in feeds and shelves. The immersive `/shorts/`
   swipe player is not covered.
-- YouTube's DOM shifts; selectors in `TILE_SELECTOR` and `extract()` may need
-  updating if tiles stop being detected.
+- X posts with no text (photo or video only) aren't judged.
+- The X and LinkedIn adapters are written against those sites' current markup
+  (`data-testid="tweet"`, `update-components-text`, …) and tested on fixture pages that
+  copy it, not on a logged-in live feed. All three sites change their DOM often; if items
+  stop being blurred, the selectors in the site adapters at the top of `content.js` are
+  the place to look.

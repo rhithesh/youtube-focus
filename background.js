@@ -1,6 +1,6 @@
 // Feed Filter — service worker.
-// Batches YouTube feed listings into a single TypeSafe System One (Jev) call and
-// turns the typed answers into block/allow verdicts.
+// Batches feed items (YouTube videos, X posts, LinkedIn posts) into a single
+// TypeSafe System One (Jev) call and turns the typed answers into block/allow verdicts.
 
 const ENDPOINTS = {
   openrouter: "https://openrouter.ai/api/v1/systemone",
@@ -14,7 +14,7 @@ const DEFAULT_SETTINGS = {
   model: "jev-latest",
   goals: "",
   onboarded: false,
-  surfaces: { home: true, search: true, sidebar: true, shorts: true },
+  surfaces: { home: true, search: true, sidebar: true, shorts: true, x: true, linkedin: true },
   baitThreshold: 2.0,
   offGoalThreshold: 2.6,
   junkThreshold: 0.85, // clickbait reads 0.45-0.75 on this question; real scams read 0.9+
@@ -25,17 +25,17 @@ const DEFAULT_SETTINGS = {
 };
 
 // Jev evaluates every question against the state in one parallel pass, so a whole
-// feed page fits in one request. 20 listings = 60 questions, ~5k input tokens.
+// feed page fits in one request. 20 items = 60 questions, ~5k input tokens.
 const BATCH_SIZE = 20;
 const MAX_PARALLEL = 3;
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CACHE_LIMIT = 6000;
 
 const BAIT_LEVELS = [
-  "Plain and accurate. The title says what the video actually contains — no exaggeration, nothing withheld, no emotional hook.",
-  "Mildly promotional. Slightly punchy or curiosity-driven phrasing, but the title still describes the real content honestly.",
-  "Clear clickbait. Manufactured curiosity or outrage: withheld payoff, shock claims, ALL-CAPS or emoji spam, fake urgency, inflated stakes, misleading superlatives, '#1 thing nobody tells you'.",
-  "Pure engagement bait. The title exists only to force a click and almost certainly misrepresents the video: 'you won't believe', invented drama, fabricated numbers, rage-bait, fake reveals.",
+  "Plain and accurate. It says what it actually contains — no exaggeration, nothing withheld, no emotional hook.",
+  "Mildly promotional. Slightly punchy or curiosity-driven phrasing, but it still describes the real content honestly.",
+  "Clear bait. Manufactured curiosity or outrage: withheld payoff, shock claims, ALL-CAPS or emoji spam, fake urgency, inflated stakes, misleading superlatives, '#1 thing nobody tells you', one-line-per-sentence 'broetry' built to force a 'see more' click, or a closing 'Agree?' / 'Thoughts?' that exists to farm comments.",
+  "Pure engagement bait. It exists only to force a click or reaction and almost certainly misrepresents itself: 'you won't believe', invented drama, fabricated stories or numbers, rage-bait, fake reveals, 'comment YES and I'll DM you', 'repost if you agree'.",
 ];
 
 const GOAL_LEVELS = [
@@ -46,9 +46,11 @@ const GOAL_LEVELS = [
 ];
 
 const JUNK_TRUE =
-  "Spam, a scam, or mass-produced filler: crypto and get-rich-quick pitches, fake giveaways, engagement farming, AI-generated slop, stolen or re-uploaded content, misleading medical or financial claims, or a channel pumping out near-identical videos.";
+  "Spam, a scam, or mass-produced filler: crypto and get-rich-quick pitches, fake giveaways, engagement farming, generic AI-written filler, stolen or re-uploaded content, misleading medical or financial claims, or an account pumping out near-identical posts or videos.";
 const JUNK_FALSE =
-  "A genuine video from a real channel, whatever its quality or subject.";
+  "A genuine post or video from a real person or channel, whatever its quality or subject.";
+
+const PLATFORM = { youtube: "YouTube", x: "X (Twitter)", linkedin: "LinkedIn" };
 
 /* ---------------------------------------------------------------- settings */
 
@@ -70,9 +72,12 @@ function hash32(str) {
 
 // Every cached verdict is stamped with the goals + thresholds it was judged under,
 // so editing either one invalidates the cache instead of serving stale blocks.
+// Bump when the question wording changes so verdicts from the old wording are re-judged.
+const RUBRIC_VERSION = 2;
+
 function rubricStamp(s) {
   return hash32(
-    [s.goals, s.model, s.baitThreshold, s.offGoalThreshold, s.junkThreshold, s.minConfidence].join("|")
+    [RUBRIC_VERSION, s.goals, s.model, s.baitThreshold, s.offGoalThreshold, s.junkThreshold, s.minConfidence].join("|")
   );
 }
 
@@ -118,30 +123,44 @@ async function maybePrune() {
 
 /* ------------------------------------------------------------ jev requests */
 
+function describe(v) {
+  if (v.platform === "x" || v.platform === "linkedin") {
+    return {
+      platform: PLATFORM[v.platform],
+      format: "feed post",
+      text: v.title,
+      author: v.author || "unknown",
+      metadata: v.meta || "",
+    };
+  }
+  return {
+    platform: PLATFORM.youtube,
+    format: v.isShort ? "YouTube Short (vertical, under 60s)" : "regular video",
+    title: v.title,
+    channel: v.author || v.channel || "unknown",
+    duration: v.duration || "unknown",
+    metadata: v.meta || "",
+  };
+}
+
 function buildRequest(videos, s) {
   const state = {
     my_goals: s.goals?.trim() || "(the viewer has not stated any goals)",
-    videos: {},
+    items: {},
   };
   const questions = {};
 
   videos.forEach((v, i) => {
     const k = "v" + i;
-    state.videos[k] = {
-      title: v.title,
-      channel: v.channel || "unknown",
-      duration: v.duration || "unknown",
-      metadata: v.meta || "",
-      format: v.isShort ? "YouTube Short (vertical, under 60s)" : "regular video",
-    };
+    state.items[k] = describe(v);
 
     questions[k + "_bait"] = {
       type: "score",
       instructions: {
-        listing: "videos." + k,
+        item: "items." + k,
         question:
-          "Rate how much the listing at `videos." + k +
-          "` relies on clickbait. Judge the title and channel exactly as a viewer sees them in a feed, before clicking.",
+          "Rate how much the feed item at `items." + k +
+          "` relies on clickbait or engagement bait. Judge it exactly as someone scrolling past sees it, before they click or expand it.",
       },
       criteria: BAIT_LEVELS,
     };
@@ -149,9 +168,9 @@ function buildRequest(videos, s) {
     questions[k + "_goal"] = {
       type: "score",
       instructions: {
-        listing: "videos." + k,
+        item: "items." + k,
         question:
-          "The viewer's own goals are in `my_goals`. Rate how far the listing at `videos." + k +
+          "The viewer's own goals are in `my_goals`. Rate how far the feed item at `items." + k +
           "` sits from those goals. Judge the subject matter, not the production quality.",
       },
       criteria: GOAL_LEVELS,
@@ -160,8 +179,8 @@ function buildRequest(videos, s) {
     questions[k + "_junk"] = {
       type: "noul",
       instructions: {
-        listing: "videos." + k,
-        question: "The listing at `videos." + k + "` is spam, a scam, or mass-produced low-effort filler.",
+        item: "items." + k,
+        question: "The feed item at `items." + k + "` is spam, a scam, or mass-produced low-effort filler.",
       },
       criteria: { true: JUNK_TRUE, false: JUNK_FALSE },
     };
@@ -247,6 +266,12 @@ const BAIT_PATTERNS = [
   /\$\d+[km]?\b.{0,24}\bin \d+ (day|hour|minute|week)/i, /!{2,}/, /\?{2,}/,
   /\b(must|need to) (watch|see)\b/i, /\bdon'?t (do|buy|watch|make) (this|these)\b/i,
 ];
+// Post-style bait on X and LinkedIn.
+const POST_BAIT_PATTERNS = [
+  /\b(agree|thoughts)\?\s*$/i, /\bcomment ["'“]?\w+["'”]? (below|and i[’']?ll)/i, /\brepost if\b/i,
+  /\bfollow (me )?for more\b/i, /\bhere[’']?s what happened( next)?\b/i, /\b(99|90)% of (people|developers|founders)\b/i,
+  /\bwill blow your mind\b/i, /\bdestroy(ed|s)\b/i,
+];
 const JUNK_PATTERNS = [
   /\bfree (robux|v-?bucks|giveaway|crypto|bitcoin)\b/i, /\bairdrop\b/i,
   /\bmake \$?\d+ *(a|per) (day|week|month)\b/i, /\bpassive income\b/i,
@@ -260,8 +285,8 @@ function heuristicVerdict(v, s) {
   const emoji = Array.from(title).filter((c) => c.codePointAt(0) > 0x2100).length;
 
   let bait = 0;
-  bait += Math.min(2, BAIT_PATTERNS.filter((r) => r.test(title)).length);
-  if (caps > 0.6 && letters.length > 8) bait += 1;
+  bait += Math.min(2, [...BAIT_PATTERNS, ...POST_BAIT_PATTERNS].filter((r) => r.test(title)).length);
+  if (caps > 0.6 && letters.length > 8 && letters.length < 200) bait += 1;
   if (emoji >= 2) bait += 1;
   bait = Math.min(3, bait);
 
@@ -328,9 +353,11 @@ async function handleTest(goals) {
   if (!s.apiKey) return { ok: false, error: "No API key set." };
 
   const samples = [
-    { id: "t0", title: "You WON'T BELIEVE what happened next 😱😱 (GONE WRONG)", channel: "DramaDaily", duration: "18:02", meta: "2.1M views · 3 days ago" },
-    { id: "t1", title: "Rust's ownership model explained with memory diagrams", channel: "Systems Weekly", duration: "41:15", meta: "84K views · 1 month ago" },
-    { id: "t2", title: "Make $5,000 a day with this FREE crypto airdrop bot", channel: "Wealth Signals", duration: "6:44", meta: "12K views · 2 days ago" },
+    { id: "t0", platform: "youtube", title: "You WON'T BELIEVE what happened next 😱😱 (GONE WRONG)", author: "DramaDaily", duration: "18:02", meta: "2.1M views · 3 days ago" },
+    { id: "t1", platform: "youtube", title: "Rust's ownership model explained with memory diagrams", author: "Systems Weekly", duration: "41:15", meta: "84K views · 1 month ago" },
+    { id: "t2", platform: "youtube", title: "Make $5,000 a day with this FREE crypto airdrop bot", author: "Wealth Signals", duration: "6:44", meta: "12K views · 2 days ago" },
+    { id: "t3", platform: "x", title: "99% of developers don't know these 7 VS Code tricks.\n\nThe 4th one will blow your mind 🤯🧵", author: "Dev Tips Daily @devtipsdaily · 3h", meta: "" },
+    { id: "t4", platform: "linkedin", title: "I fired my best employee.\n\nHe was talented.\n\nBut he taught me something.\n\nHere's what happened next 👇\n\nAgree?", author: "Growth Coach", meta: "Helping founders 10x their mindset" },
   ];
 
   const t0 = Date.now();

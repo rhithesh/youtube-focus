@@ -2,7 +2,7 @@
   position: relative !important;
 }
 
-/* The frosted veil. backdrop-filter blurs the tile underneath. */
+/* The frosted veil. backdrop-filter blurs the item underneath. */
 .ygf-veil {
   position: absolute;
   inset: 0;
@@ -15,10 +15,13 @@
   opacity: 1;
 }
 
-/* Hovering anywhere on the tile clears the veil and lets the click through to
-   YouTube's own link. :hover sits on the tile, not the veil, so it stays put
+/* Hovering anywhere on the item clears the veil and lets the click through to
+   the site's own link. :hover sits on the item, not the veil, so it stays put
    once the veil stops taking pointer events. */
 .ygf-host:hover > .ygf-veil {
   opacity: 0;
   pointer-events: none;
 }
+
+.ygf-host--x > .ygf-veil { border-radius: 0; }
+.ygf-host--linkedin > .ygf-veil { border-radius: 8px; }

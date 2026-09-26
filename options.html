@@ -5,14 +5,15 @@
 <title>Feed Filter — settings</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="options.css">
 </head>
 <body>
 <main>
   <header>
-    <h1>Feed Filter</h1>
-    <p class="sub">YouTube listings are judged by <a href="https://docs.typesafe.ai" target="_blank" rel="noreferrer">TypeSafe's Jev</a>, a System One model that returns typed, calibrated decisions instead of text. Anything flagged is blurred until you hover it.</p>
+    <p class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="7" fill="#16150f"/><rect x="6" y="6.5" width="12" height="2.4" rx="1.2" fill="#c9f25d"/><rect x="6" y="10.8" width="12" height="2.4" rx="1.2" fill="#f3f0e8" opacity=".28"/><rect x="6" y="15.1" width="8" height="2.4" rx="1.2" fill="#c9f25d"/></svg>Feed Filter</p>
+    <h1>Your feeds, <em>minus the noise.</em></h1>
+    <p class="sub">YouTube videos, X posts and LinkedIn posts are judged by <a href="https://docs.typesafe.ai" target="_blank" rel="noreferrer">TypeSafe's Jev</a>, a System One model that returns typed, calibrated decisions instead of text. Anything flagged is blurred until you hover it.</p>
   </header>
 
   <section id="welcome" hidden>
@@ -21,16 +22,16 @@
   </section>
 
   <section>
-    <h2>1 &middot; Your goals</h2>
+    <h2><span class="n">1</span>Your goals</h2>
     <label class="field">
-      <span class="label">What do you actually want out of YouTube?</span>
+      <span class="label">What do you actually want out of your feeds?</span>
       <textarea id="goals" rows="7" placeholder="e.g. I'm learning systems programming and want to go deep on Rust, databases and distributed systems. I also follow AI research seriously — papers and real implementations, not commentary. Outside that I want strength training and cooking. I do NOT want tech drama, reaction videos, productivity hustle content, news-of-the-week, or gaming."></textarea>
       <span class="hint">Say what you want <em>and</em> what you don&rsquo;t. Negatives are the strongest signal you can give it.</span>
     </label>
   </section>
 
   <section>
-    <h2>2 &middot; API access</h2>
+    <h2><span class="n">2</span>API access</h2>
     <div class="row">
       <label class="field">
         <span class="label">Provider</span>
@@ -57,27 +58,33 @@
   </section>
 
   <section>
-    <h2>3 &middot; Where to filter</h2>
+    <h2><span class="n">3</span>Where to filter</h2>
+    <p class="label">YouTube</p>
     <div class="grid">
       <label class="check"><input type="checkbox" data-surface="home"> Home feed</label>
       <label class="check"><input type="checkbox" data-surface="search"> Search results</label>
       <label class="check"><input type="checkbox" data-surface="sidebar"> Watch-next sidebar</label>
       <label class="check"><input type="checkbox" data-surface="shorts"> Shorts</label>
     </div>
-    <label class="check block"><input id="hideUntilChecked" type="checkbox"> Blur every tile until it has been judged <span class="hint inline">(no flash of clickbait, but the feed fills in a beat slower)</span></label>
+    <p class="label spaced">Other feeds</p>
+    <div class="grid">
+      <label class="check"><input type="checkbox" data-surface="x"> X (Twitter) timeline</label>
+      <label class="check"><input type="checkbox" data-surface="linkedin"> LinkedIn feed</label>
+    </div>
+    <label class="check block"><input id="hideUntilChecked" type="checkbox"> Blur every item until it has been judged <span class="hint inline">(no flash of clickbait, but the feed fills in a beat slower)</span></label>
   </section>
 
   <section>
-    <h2>4 &middot; Blur</h2>
+    <h2><span class="n">4</span>Blur</h2>
     <label class="field slider">
-      <span class="label">Blur strength <output id="blurOut"></output><span class="scale">hover a tile to clear it</span></span>
+      <span class="label">Blur strength <output id="blurOut"></output><span class="scale">hover an item to clear it</span></span>
       <input id="blurStrength" type="range" min="0" max="100" step="5">
-      <span class="hint">Flagged videos are frosted over. Move the pointer onto one and the blur lifts so you can read it and click through.</span>
+      <span class="hint">Flagged items are blurred. Move the pointer onto one and the blur lifts so you can read it and click through.</span>
     </label>
   </section>
 
   <section>
-    <h2>5 &middot; How strict</h2>
+    <h2><span class="n">5</span>How strict</h2>
 
     <label class="field slider">
       <span class="label">Clickbait <output id="baitOut"></output><span class="scale">0 plain &rarr; 3 pure bait</span></span>
@@ -88,7 +95,7 @@
     <label class="field slider">
       <span class="label">Off-goal <output id="offGoalOut"></output><span class="scale">0 on-target &rarr; 3 unrelated</span></span>
       <input id="offGoalThreshold" type="range" min="0.5" max="3" step="0.1">
-      <span class="hint">Block when a video is this far from your goals. Only applies once you&rsquo;ve written goals above.</span>
+      <span class="hint">Block when an item is this far from your goals. Only applies once you&rsquo;ve written goals above.</span>
     </label>
 
     <label class="field slider">

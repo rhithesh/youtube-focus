@@ -4,51 +4,73 @@
 <meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <style>
+  :root { --paper: #f3f0e8; --card: #fff; --ink: #16150f; --muted: #6b665b; --line: rgba(22,21,15,.12); --lime: #c9f25d; }
   body {
-    width: 260px; margin: 0; padding: 16px;
-    background: #fff; color: #000;
-    font: 13px/1.5 "Comfortaa", sans-serif;
+    width: 290px; margin: 0; padding: 14px;
+    background: var(--paper); color: var(--ink);
+    font: 13px/1.5 "Geist", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
-  .top { display: flex; align-items: center; gap: 10px; }
-  .name { flex: 1; font-size: 16px; font-weight: 700; }
-  .switch { position: relative; width: 36px; height: 20px; flex: none; }
-  .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
-  .track {
-    position: absolute; inset: 0; border: 1px solid #000;
-    background: #fff; pointer-events: none;
+  .top { display: flex; align-items: center; gap: 8px; padding: 2px 2px 0; }
+  .top svg { width: 22px; height: 22px; flex: none; }
+  .name { flex: 1; font-size: 14px; font-weight: 500; }
+
+  .power {
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 12px; padding: 12px 14px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
   }
+  .state { flex: 1; font: 400 26px/1 "Instrument Serif", Georgia, serif; letter-spacing: -.01em; }
+  .state em { font-style: italic; }
+  .switch { position: relative; width: 46px; height: 28px; flex: none; }
+  .switch input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; z-index: 1; }
+  .track { position: absolute; inset: 0; border-radius: 999px; background: rgba(22,21,15,.15); transition: background .25s; pointer-events: none; }
   .track::after {
-    content: ""; position: absolute; top: 2px; left: 2px;
-    width: 14px; height: 14px; background: #fff; border: 1px solid #000; transition: transform .1s;
+    content: ""; position: absolute; top: 4px; left: 4px;
+    width: 20px; height: 20px; border-radius: 50%; background: var(--card);
+    box-shadow: 0 1px 3px rgba(0,0,0,.25);
+    transition: transform .3s cubic-bezier(.3,1.4,.5,1), background .25s;
   }
-  .switch input:checked + .track { background: #000; }
-  .switch input:checked + .track::after { transform: translateX(15px); background: #fff; }
+  .switch input:checked + .track { background: var(--ink); }
+  .switch input:checked + .track::after { transform: translateX(18px); background: var(--lime); }
+  .switch input:focus-visible + .track { box-shadow: 0 0 0 3px rgba(201,242,93,.8); }
 
-  .stats { display: flex; gap: 8px; margin: 14px 0 12px; }
-  .stat { flex: 1; padding: 10px; border: 1px solid #000; text-align: center; }
-  .stat b { display: block; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .stat span { font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: #555; }
+  .stats { display: flex; gap: 8px; margin-top: 8px; }
+  .stat { flex: 1; padding: 10px 12px 11px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
+  .stat b { display: block; font: 400 32px/1 "Instrument Serif", Georgia, serif; font-variant-numeric: tabular-nums; }
+  .stat span { display: block; margin-top: 4px; font-size: 11.5px; color: var(--muted); }
 
-  .goals { padding: 10px; border: 1px solid #000; color: #000; font-size: 12px; max-height: 76px; overflow: hidden; }
-  .warn { margin-top: 10px; padding: 9px 10px; border: 1px solid #000; font-size: 12px; }
-  button.link { display: block; width: 100%; margin-top: 12px; padding: 9px; background: #fff; border: 1px solid #000; color: #000; font: inherit; font-weight: 700; cursor: pointer; }
-  button.link:hover { background: #000; color: #fff; }
+  .goals { margin-top: 8px; padding: 10px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
+  .goals .k { display: block; margin-bottom: 2px; font-size: 11.5px; color: var(--muted); }
+  .goals p { margin: 0; font-size: 12.5px; max-height: 58px; overflow: hidden; }
+  .warn { margin-top: 8px; padding: 9px 12px; border-radius: 14px; background: #ebe6da; font-size: 12px; }
+  button.link {
+    display: block; width: 100%; margin-top: 10px; padding: 10px;
+    background: var(--ink); border: 0; border-radius: 999px; color: var(--paper);
+    font: inherit; font-weight: 500; cursor: pointer; transition: transform .15s;
+  }
+  button.link:hover { transform: translateY(-1px); }
 </style>
 </head>
 <body>
   <div class="top">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="7" fill="#16150f"/><rect x="6" y="6.5" width="12" height="2.4" rx="1.2" fill="#c9f25d"/><rect x="6" y="10.8" width="12" height="2.4" rx="1.2" fill="#f3f0e8" opacity=".28"/><rect x="6" y="15.1" width="8" height="2.4" rx="1.2" fill="#c9f25d"/></svg>
     <span class="name">Feed Filter</span>
-    <label class="switch"><input id="enabled" type="checkbox"><span class="track"></span></label>
   </div>
 
+  <label class="power">
+    <span class="state" id="state">Filter <em>on</em></span>
+    <span class="switch"><input id="enabled" type="checkbox" aria-label="Filter"><span class="track"></span></span>
+  </label>
+
   <div class="stats">
-    <div class="stat"><b id="blocked">—</b><span>blocked here</span></div>
+    <div class="stat"><b id="blocked">—</b><span>blurred on this page</span></div>
     <div class="stat"><b id="judged">—</b><span>judged</span></div>
   </div>
 
-  <div class="goals" id="goals">No goals set yet.</div>
+  <div class="goals"><span class="k">Your goal</span><p id="goals">No goals set yet.</p></div>
   <div class="warn" id="warn" hidden></div>
 
   <button class="link" id="open">Settings &amp; goals</button>
