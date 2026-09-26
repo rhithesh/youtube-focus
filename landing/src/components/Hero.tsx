@@ -231,9 +231,7 @@ export function Hero() {
           ))}
         </div>
       </motion.div>
-      <p className="relative mx-auto -mt-6 max-w-[1200px] px-5 text-center text-[13px] text-muted">
-        Every blur above is the model&rsquo;s real verdict for that post. Hover the wall to stop it, then hover a card to peek.
-      </p>
+
     </section>
   );
 }
