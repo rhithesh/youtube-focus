@@ -76,31 +76,15 @@ function Headline({ on }: { on: boolean }) {
   return (
     <h1 className="font-serif text-[clamp(58px,10.5vw,148px)] leading-[0.9] tracking-[-0.025em]">
       {words.map((w, i) => (
-        <motion.span
-          key={w}
-          className="mr-[0.2em] inline-block"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.9, delay: 0.1 + i * 0.1, ease: EASE }}
-        >
+        <span key={w} className="ff-slide mr-[0.2em] inline-block" style={{ "--d": 0.05 + i * 0.08 + "s" } as React.CSSProperties}>
           {w}
-        </motion.span>
+        </span>
       ))}
       <br />
-      <motion.span
-        className="mr-[0.2em] inline-block"
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.9, delay: 0.3, ease: EASE }}
-      >
+      <span className="ff-slide mr-[0.2em] inline-block" style={{ "--d": "0.21s" } as React.CSSProperties}>
         minus
-      </motion.span>
-      <motion.span
-        className="inline-block"
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.9, delay: 0.4, ease: EASE }}
-      >
+      </span>
+      <span className="ff-slide inline-block" style={{ "--d": "0.29s" } as React.CSSProperties}>
         the{" "}
         <motion.span
           className="inline-block cursor-help italic"
@@ -111,7 +95,7 @@ function Headline({ on }: { on: boolean }) {
         >
           noise.
         </motion.span>
-      </motion.span>
+      </span>
     </h1>
   );
 }
@@ -148,12 +132,9 @@ export function Hero() {
   return (
     <section id="top" className="relative overflow-hidden pt-32 sm:pt-36">
       <div className="mx-auto max-w-[1200px] px-5 text-center">
-        <motion.div
-          className="inline-flex items-center gap-2 rounded-full border border-ink/10 bg-card/70 px-3 py-1.5 text-[13px] text-muted"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
+        {/* Above-the-fold entrances are CSS (.ff-rise), not Motion: they start with the first paint
+            instead of waiting for hydration, which keeps Largest Contentful Paint fast. */}
+        <div className="ff-rise inline-flex items-center gap-2 rounded-full border border-ink/10 bg-card/70 px-3 py-1.5 text-[13px] text-muted">
           <span className="flex gap-1">
             <Glyph platform="youtube" className="size-4" />
             <Glyph platform="x" className="size-4" />
@@ -161,28 +142,21 @@ export function Hero() {
           </span>
           <span className="hidden sm:inline">A Chrome extension for YouTube, X and LinkedIn</span>
           <span className="sm:hidden">For YouTube, X and LinkedIn</span>
-        </motion.div>
+        </div>
 
         <div className="mt-7">
           <Headline on={on} />
         </div>
 
-        <motion.p
-          className="mx-auto mt-7 max-w-[560px] text-[17px] leading-relaxed text-muted sm:text-[18px]"
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.55, ease: EASE }}
+        <p
+          className="ff-slide mx-auto mt-7 max-w-[560px] text-[17px] leading-relaxed text-muted sm:text-[18px]"
+          style={{ "--d": "0.3s" } as React.CSSProperties}
         >
           Write down what you&rsquo;re on these sites for. Feed Filter blurs the clickbait, the scams and
           everything off-goal. Hover anything to see it anyway.
-        </motion.p>
+        </p>
 
-        <motion.div
-          className="mt-9 flex flex-wrap justify-center gap-3"
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.65, ease: EASE }}
-        >
+        <div className="ff-rise mt-9 flex flex-wrap justify-center gap-3" style={{ "--d": "0.38s" } as React.CSSProperties}>
           <a href="#install" className={btn.ink}>
             Add to Chrome, free
             <span aria-hidden>→</span>
@@ -190,14 +164,12 @@ export function Hero() {
           <a href="#how" className={btn.ghost}>
             How it works
           </a>
-        </motion.div>
+        </div>
       </div>
 
-      <motion.div
-        className="relative z-20 mx-auto mt-16 flex w-fit max-w-[calc(100%-2.5rem)] flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-[22px] border border-ink/10 bg-card px-4 py-3 shadow-[0_12px_40px_-16px_rgba(22,21,15,0.35)] sm:rounded-full sm:py-2.5 sm:pl-3"
-        initial={{ opacity: 0, y: 16, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.7, delay: 0.8, ease: EASE }}
+      <div
+        style={{ "--d": "0.55s" } as React.CSSProperties}
+        className="ff-rise relative z-20 mx-auto mt-16 flex w-fit max-w-[calc(100%-2.5rem)] flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-[22px] border border-ink/10 bg-card px-4 py-3 shadow-[0_12px_40px_-16px_rgba(22,21,15,0.35)] sm:rounded-full sm:py-2.5 sm:pl-3"
       >
         <div className="flex items-center gap-3">
           <Toggle on={on} onChange={setFilter} />
@@ -214,14 +186,11 @@ export function Hero() {
           </motion.span>{" "}
           of {WALL_TOTAL} blurred
         </span>
-      </motion.div>
+      </div>
 
       <motion.div
         ref={wallRef}
-        className="wall-mask relative -mt-7 h-[620px] overflow-hidden sm:h-[700px]"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1, delay: 0.5 }}
+        className="ff-fade wall-mask relative -mt-7 h-[620px] overflow-hidden sm:h-[700px]"
         onHoverStart={() => setHovering(true)}
         onHoverEnd={() => setHovering(false)}
       >

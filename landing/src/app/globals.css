@@ -46,3 +46,22 @@ body {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 80%, transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 80%, transparent 100%);
 }
+
+/* Hero entrances. Plain CSS so they run from the first paint, before hydration. */
+@keyframes ff-rise {
+  from { opacity: 0; transform: translateY(0.4em); }
+}
+@keyframes ff-fade {
+  from { opacity: 0; }
+}
+/* Headline and intro only slide, never fade: Chrome ignores anything painted at opacity 0
+   when it picks the Largest Contentful Paint, so a fade-in would push LCP back seconds. */
+@keyframes ff-slide {
+  from { transform: translateY(0.35em); }
+}
+.ff-rise { animation: ff-rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0s) both; }
+.ff-slide { animation: ff-slide 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0s) both; }
+.ff-fade { animation: ff-fade 1s ease-out 0.4s both; }
+@media (prefers-reduced-motion: reduce) {
+  .ff-rise, .ff-slide, .ff-fade { animation: none; }
+}

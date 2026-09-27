@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { SITE, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const geist = Geist({ variable: "--font-geist", subsets: ["latin"] });
@@ -12,16 +13,39 @@ const instrument = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Feed Filter — your YouTube, X and LinkedIn feeds, minus the noise",
-  description:
-    "A Chrome extension that blurs clickbait, spam and off-goal posts on YouTube, X and LinkedIn, judged against goals you write yourself. Hover to see one. Nothing is ever deleted.",
-  metadataBase: new URL("https://feedfilter.video"),
+  metadataBase: new URL(SITE_URL),
+  title: { default: SITE.title, template: `%s · ${SITE.name}` },
+  description: SITE.description,
+  applicationName: SITE.name,
+  keywords: SITE.keywords,
+  authors: [SITE.author],
+  creator: SITE.author.name,
+  category: "productivity",
+  alternates: { canonical: "/" },
   openGraph: {
-    title: "Feed Filter — your feeds, minus the noise",
-    description:
-      "Write your goals. Every post on the page is judged in one request. Clickbait, spam and distractions stay blurred until you hover.",
     type: "website",
+    url: "/",
+    siteName: SITE.name,
+    locale: "en_US",
+    title: `${SITE.name}: ${SITE.shortTitle.toLowerCase()}`,
+    description: SITE.description,
   },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE.name}: ${SITE.shortTitle.toLowerCase()}`,
+    description: SITE.description,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 },
+  },
+  formatDetection: { telephone: false, email: false, address: false },
+};
+
+export const viewport: Viewport = {
+  themeColor: SITE.theme,
+  colorScheme: "light",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

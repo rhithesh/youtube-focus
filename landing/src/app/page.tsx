@@ -7,10 +7,12 @@ import { Install } from "@/components/Install";
 import { MotionRoot } from "@/components/MotionRoot";
 import { Navbar } from "@/components/Navbar";
 import { Platforms } from "@/components/Platforms";
+import { StructuredData } from "@/components/StructuredData";
 
 export default function Home() {
   return (
     <MotionRoot>
+      <StructuredData />
       <Navbar />
       <main>
         <Hero />
