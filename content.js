@@ -481,7 +481,12 @@
         continue;
       }
 
-      const verdict = verdicts.get(info.id);
+      let verdict = verdicts.get(info.id);
+      // A keyword-rule stand-in (the model was rate-limited or unreachable): ask again once it may be back.
+      if (verdict?.provisional && Date.now() >= (verdict.retryAt || 0)) {
+        verdicts.delete(info.id);
+        verdict = null;
+      }
       if (verdict) {
         if (verdict.tag) {
           applyBlock(el);

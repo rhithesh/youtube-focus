@@ -7,6 +7,10 @@ const ENDPOINTS = {
   typesafe: "https://api.typesafe.ai/v1/systemone",
 };
 
+// No key? The same request goes to Feed Filter's rate-limited free tier instead,
+// which forwards it to Jev with the project's own key. (Also listed in host_permissions.)
+const FREE_ENDPOINT = "https://feed-filter-two.vercel.app/api/jev";
+
 const DEFAULT_SETTINGS = {
   enabled: true,
   provider: "openrouter",
@@ -22,6 +26,7 @@ const DEFAULT_SETTINGS = {
   hideUntilChecked: false,
   blurStrength: 80, // percent; 100% renders as a 20px blur
   fallbackHeuristics: true,
+  freeTier: true, // use the free tier when no key is set
   showPagePill: true, // the on/off switch floating on YouTube, X and LinkedIn
 };
 
@@ -190,7 +195,58 @@ function buildRequest(videos, s) {
   return { model: s.model, state, questions };
 }
 
+class FreeTierError extends Error {
+  constructor(message, retryAfterSec) {
+    super(message);
+    this.retryAfterSec = retryAfterSec;
+  }
+}
+
+async function installId() {
+  const { installId } = await chrome.storage.local.get("installId");
+  if (installId) return installId;
+  const id = crypto.randomUUID();
+  await chrome.storage.local.set({ installId: id });
+  return id;
+}
+
+// The free tier's own limits are final: no retrying a 429 from it, just back off until it resets.
+async function callFree(body) {
+  let res;
+  try {
+    res = await fetch(FREE_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Feed-Filter-Install": await installId() },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    throw new FreeTierError("Free tier unreachable: " + (e.message || e), 60);
+  }
+
+  const retryAfter = Number(res.headers.get("retry-after")) || 60;
+  if (res.status === 429) {
+    const info = await res.json().catch(() => ({}));
+    const msg = info.scope === "burst"
+      ? "Free tier: too many requests, slowing down for a minute."
+      : "Free tier: today's limit is used up. Keyword rules until it resets; add your own key for unlimited.";
+    throw new FreeTierError(msg, retryAfter);
+  }
+  if (!res.ok) {
+    const info = await res.json().catch(() => ({}));
+    const msg = info.error === "free-tier-off" ? "The free tier is switched off right now. Add your own key to keep using Jev." : "Free tier error " + res.status + ".";
+    throw new FreeTierError(msg, res.status === 503 ? retryAfter : 60);
+  }
+
+  const limit = Number(res.headers.get("x-ratelimit-limit"));
+  const remaining = Number(res.headers.get("x-ratelimit-remaining"));
+  if (Number.isFinite(limit) && Number.isFinite(remaining)) {
+    await chrome.storage.local.set({ freeUsage: { limit, remaining, at: Date.now() } });
+  }
+  return res.json();
+}
+
 async function callJev(body, s, attempt = 0) {
+  if (!s.apiKey) return callFree(body);
   const url = ENDPOINTS[s.provider] || ENDPOINTS.openrouter;
   let res;
   try {
@@ -312,11 +368,24 @@ async function handleJudge(videos) {
 
   if (!todo.length) return { verdicts: cached, settings: s };
 
+  // Keyword rules stand in whenever the model can't be used. Those verdicts aren't cached
+  // and, when a model is available at all, carry a retryAt so the tab asks again later.
+  const modelAvailable = !!s.apiKey || s.freeTier;
+  const heuristicsFor = (items, extra = {}, retryAt = Date.now() + 60_000) => {
+    const out = { ...cached, ...extra };
+    if (!s.fallbackHeuristics) return out;
+    for (const v of items) {
+      if (v.id in out) continue;
+      out[v.id] = modelAvailable ? { ...heuristicVerdict(v, s), provisional: true, retryAt } : heuristicVerdict(v, s);
+    }
+    return out;
+  };
+
   if (!s.apiKey) {
-    if (!s.fallbackHeuristics) return { verdicts: cached, settings: s, error: "No API key set." };
-    const out = { ...cached };
-    for (const v of todo) out[v.id] = heuristicVerdict(v, s);
-    return { verdicts: out, settings: s, degraded: "no-key" };
+    if (!s.freeTier) return { verdicts: heuristicsFor(todo), settings: s, degraded: "no-key" };
+    const { freePausedUntil } = await chrome.storage.local.get("freePausedUntil");
+    if (freePausedUntil && Date.now() < freePausedUntil)
+      return { verdicts: heuristicsFor(todo, {}, freePausedUntil), settings: s, degraded: "free-paused" };
   }
 
   const chunks = [];
@@ -324,6 +393,7 @@ async function handleJudge(videos) {
 
   const fresh = {};
   let error = null;
+  let retryAt = Date.now() + 60_000;
 
   for (let i = 0; i < chunks.length; i += MAX_PARALLEL) {
     const slice = chunks.slice(i, i + MAX_PARALLEL);
@@ -336,14 +406,21 @@ async function handleJudge(videos) {
         });
       })
     );
-    for (const r of results) if (r.status === "rejected") error = String(r.reason?.message || r.reason);
+    for (const r of results) {
+      if (r.status !== "rejected") continue;
+      error = String(r.reason?.message || r.reason);
+      if (r.reason instanceof FreeTierError) {
+        retryAt = Date.now() + r.reason.retryAfterSec * 1000;
+        await chrome.storage.local.set({ freePausedUntil: retryAt });
+      }
+    }
   }
 
   if (Object.keys(fresh).length) await writeCache(fresh, stamp);
   if (error) await chrome.storage.local.set({ lastError: { msg: error, at: Date.now() } });
   else await chrome.storage.local.remove("lastError");
 
-  return { verdicts: { ...cached, ...fresh }, settings: s, error };
+  return { verdicts: heuristicsFor(todo, fresh, retryAt), settings: s, error };
 }
 
 /* -------------------------------------------------------------- test call */
@@ -351,7 +428,7 @@ async function handleJudge(videos) {
 async function handleTest(goals) {
   const s = await getSettings();
   if (goals !== undefined) s.goals = goals;
-  if (!s.apiKey) return { ok: false, error: "No API key set." };
+  if (!s.apiKey && !s.freeTier) return { ok: false, error: "No API key set, and the free tier is switched off." };
 
   const samples = [
     { id: "t0", platform: "youtube", title: "You WON'T BELIEVE what happened next 😱😱 (GONE WRONG)", author: "DramaDaily", duration: "18:02", meta: "2.1M views · 3 days ago" },

@@ -15,11 +15,11 @@ const FAQS = [
   },
   {
     q: "What does it cost?",
-    a: "The extension is free. You bring an OpenRouter key: about $0.0003 to judge a page of ten posts, and verdicts are cached for a week. Without a key, keyword rules still catch obvious bait and scams.",
+    a: "Nothing, to start. Without a key, Feed Filter’s free tier judges up to 300 posts a day, and verdicts are cached for a week so scrolling back past something doesn’t count again. Want unlimited? Bring your own OpenRouter key: about $0.0003 for a page of ten posts. If the free tier is ever used up, keyword rules keep catching the obvious bait until it resets.",
   },
   {
-    q: "Where do my key and goals go?",
-    a: "They stay in your browser (chrome.storage.local) and are sent only to the model endpoint you pick: OpenRouter or TypeSafe. There is no Feed Filter server.",
+    q: "Where do my posts and goals go?",
+    a: "On the free tier, the text of each post and your goals pass through Feed Filter’s server on their way to the model; nothing is stored or logged, only an anonymous daily counter. With your own key, they go straight from your browser to OpenRouter or TypeSafe and Feed Filter never sees them. Settings and keys live in your browser (chrome.storage.local).",
   },
   {
     q: "What won’t it catch?",

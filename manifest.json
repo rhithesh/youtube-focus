@@ -6,7 +6,8 @@
   "permissions": ["storage"],
   "host_permissions": [
     "https://openrouter.ai/*",
-    "https://api.typesafe.ai/*"
+    "https://api.typesafe.ai/*",
+    "https://feed-filter-two.vercel.app/*"
   ],
   "background": {
     "service_worker": "background.js",

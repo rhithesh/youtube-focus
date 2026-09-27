@@ -31,7 +31,8 @@
   </section>
 
   <section>
-    <h2><span class="n">2</span>API access</h2>
+    <h2><span class="n">2</span>API access <span class="tag">optional</span></h2>
+    <p class="lead">No key? Feed Filter&rsquo;s free tier judges up to 300 posts a day for you. Add your own OpenRouter or TypeSafe key for unlimited use; your posts then go straight to that provider instead of through Feed Filter&rsquo;s server.</p>
     <div class="row">
       <label class="field">
         <span class="label">Provider</span>
@@ -46,13 +47,14 @@
       </label>
     </div>
     <label class="field">
-      <span class="label">API key</span>
-      <input id="apiKey" type="password" spellcheck="false" autocomplete="off" placeholder="sk-or-v1-…">
+      <span class="label">Your API key</span>
+      <input id="apiKey" type="password" spellcheck="false" autocomplete="off" placeholder="Leave empty to use the free tier">
       <span class="hint">Stored in this browser only (<code>chrome.storage.local</code>) and sent to the provider endpoint, nowhere else. Input is billed at $0.042 / Mtok; output is free. A full feed page costs a fraction of a cent.</span>
     </label>
+    <label class="check block"><input id="freeTier" type="checkbox"> Use the free tier when no key is set <span class="hint inline">(post text and your goals pass through Feed Filter&rsquo;s server on the way to Jev; nothing is stored)</span></label>
     <div class="row">
       <button id="test" class="btn">Run a test call</button>
-      <label class="check"><input id="fallbackHeuristics" type="checkbox"> Use keyword heuristics when no key is set</label>
+      <label class="check"><input id="fallbackHeuristics" type="checkbox"> Fall back to keyword rules when the model can&rsquo;t be reached</label>
     </div>
     <pre id="testOut" hidden></pre>
   </section>

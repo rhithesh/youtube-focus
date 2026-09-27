@@ -10,13 +10,35 @@ typed answers with calibrated probabilities instead of prose.
 ## Install
 
 1. `chrome://extensions` → enable **Developer mode** → **Load unpacked** → pick this folder.
-2. The settings page opens on install. Write your goals, paste your API key, hit
-   **Run a test call**, then **Save**.
+2. The settings page opens on install. Write your goals, hit **Run a test call**, then
+   **Save**. A key is optional: without one, the free tier (below) is used.
 3. Reload any open YouTube, X or LinkedIn tab.
 
 Turn filtering on or off from the toolbar popup, or from the small switch that floats
 on YouTube, X and LinkedIn pages (drag it anywhere; it remembers where). Hide that
 switch under **Where to filter → Show the on/off switch on the page**.
+
+## Free tier or your own key
+
+With no key set, the extension sends the same request to Feed Filter's free tier
+(`landing/src/app/api/jev/route.ts`, deployed with the site), which forwards it to Jev
+with the project's own key. It only accepts the exact request shape the extension builds,
+and limits by item: 300 per install per day, 1,000 per IP per day, 20 requests per IP per
+minute, and 20,000 across everyone per day (all overridable with `FREE_*` env vars).
+Rejected or failed requests aren't charged. When a limit is hit, keyword rules stand in
+and the tab asks again once `Retry-After` has passed. With your own key, requests go
+straight to OpenRouter or TypeSafe and never touch Feed Filter's server.
+
+Server setup (Vercel project env vars):
+
+| Variable | |
+| --- | --- |
+| `OPENROUTER_API_KEY` | required; without it the free tier answers 503 and the extension falls back to keyword rules |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_*`) | Upstash Redis, so limits hold across serverless instances; without it counters are per instance |
+| `FREE_INSTALL_ITEMS_PER_DAY`, `FREE_IP_ITEMS_PER_DAY`, `FREE_IP_REQUESTS_PER_MINUTE`, `FREE_GLOBAL_ITEMS_PER_DAY` | limits |
+| `RATE_LIMIT_SALT` | salt for the hashed IPs and install ids in the counters |
+
+`node test/free-tier.mjs` builds the site and exercises the endpoint against a mock Jev.
 
 ## How it judges
 
@@ -97,8 +119,9 @@ popup.*           on/off, per-page counts, errors
 test/validate.mjs offline schema + threshold checks (node test/validate.mjs)
 test/browser.mjs   real content.js + real pointer input (node test/browser.mjs)
 test/dom.html      the fake-YouTube page browser.mjs drives
-test/e2e.mjs       real extension on fixture youtube.com / x.com / linkedin.com pages
-                   (node test/e2e.mjs; OPENROUTER_API_KEY=... for live Jev)
+test/e2e.mjs       real extension on fixture youtube.com / x.com / linkedin.com pages, free
+                   tier mocked (node test/e2e.mjs; OPENROUTER_API_KEY=... for live Jev)
+test/free-tier.mjs the free-tier endpoint, built and served by next start against mocks
 icons/             see below
 ```
 

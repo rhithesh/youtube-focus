@@ -9,12 +9,19 @@ async function init() {
 
   $("#goals").textContent = settings.goals?.trim() || "No goals set yet — open settings and describe what you want out of your feeds.";
 
-  const { lastError } = await chrome.storage.local.get("lastError");
-  if (!settings.apiKey) {
+  const { lastError, freeUsage, freePausedUntil } = await chrome.storage.local.get(["lastError", "freeUsage", "freePausedUntil"]);
+  const recentError = lastError && Date.now() - lastError.at < 10 * 60 * 1000;
+  if (!settings.apiKey && settings.freeTier === false) {
     show(settings.fallbackHeuristics
-      ? "No API key — running on keyword heuristics only. Add a key for Jev."
-      : "No API key set. Nothing is being filtered.");
-  } else if (lastError && Date.now() - lastError.at < 10 * 60 * 1000) {
+      ? "No API key and the free tier is off: keyword rules only."
+      : "No API key and the free tier is off. Nothing is being filtered.");
+  } else if (!settings.apiKey) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (freePausedUntil && Date.now() < freePausedUntil && recentError) show(lastError.msg);
+    else if (freeUsage && new Date(freeUsage.at).toISOString().slice(0, 10) === today)
+      showNote(`Free tier · ${freeUsage.remaining} of ${freeUsage.limit} posts left today.`);
+    else showNote("Free tier. Add your own key in settings for unlimited.");
+  } else if (recentError) {
     show(lastError.msg);
   }
 
@@ -34,6 +41,12 @@ async function init() {
 
 function showState(on) {
   $("#state").innerHTML = on ? "Filter <em>on</em>" : "Filter <em>off</em>";
+}
+
+function showNote(msg) {
+  const el = $("#note");
+  el.hidden = false;
+  el.textContent = msg;
 }
 
 function show(msg) {

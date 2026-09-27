@@ -3,8 +3,9 @@
 // local HTTPS, loads the unpacked extension over CDP, then checks what gets
 // blurred, that hover clears it, and that reloading the extension leaves no errors.
 //
-//   node test/e2e.mjs                         keyword heuristics (no key, no network)
-//   OPENROUTER_API_KEY=sk-or-... node test/e2e.mjs   live Jev verdicts
+//   node test/e2e.mjs                         no key: the free tier, served by a local mock
+//                                              (rate-limits the first call, then answers)
+//   OPENROUTER_API_KEY=sk-or-... node test/e2e.mjs   your own key: live Jev verdicts
 //
 // Needs openssl on PATH for the throwaway certificate. Set CHROME=... to override the binary.
 
@@ -35,14 +36,41 @@ const EXPECT = {
   "www.linkedin.com": { bait: true, spam: true, clean: false },
 };
 
+const FREE_HOST = "feed-filter-two.vercel.app";
+const freeCalls = [];
+
+// Stand-in for landing/src/app/api/jev: the first call is over the limit, the rest get answers.
+function freeTier(req, res, raw) {
+  const body = JSON.parse(raw);
+  freeCalls.push({ install: req.headers["x-feed-filter-install"], auth: req.headers.authorization, items: Object.keys(body.state.items).length });
+  if (freeCalls.length === 1) {
+    res.writeHead(429, { "content-type": "application/json", "retry-after": "2" }).end(JSON.stringify({ error: "limit", scope: "install", limit: 300, retryAfter: 2 }));
+    return;
+  }
+  const answers = {};
+  for (const [k, item] of Object.entries(body.state.items)) {
+    const t = JSON.stringify(item);
+    answers[k + "_bait"] = { score: /believe|99% of|fired my best/i.test(t) ? 3 : 0.2, confidence: 0.95 };
+    answers[k + "_goal"] = { score: 0.5, confidence: 0.9 };
+    answers[k + "_junk"] = { noul: /airdrop|passive income/i.test(t) ? 0.97 : 0.03 };
+  }
+  res.writeHead(200, { "content-type": "application/json", "x-ratelimit-limit": "300", "x-ratelimit-remaining": String(300 - freeCalls.length) })
+    .end(JSON.stringify({ answers, model: "jev-free-mock" }));
+}
+
 const tmp = mkdtempSync(join(tmpdir(), "ygf-e2e-"));
 execFileSync("openssl", [
   "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
   "-keyout", join(tmp, "key.pem"), "-out", join(tmp, "cert.pem"),
-  "-subj", "/CN=feed-filter-test", "-addext", "subjectAltName=" + Object.keys(HOSTS).map((h) => "DNS:" + h).join(","),
+  "-subj", "/CN=feed-filter-test", "-addext", "subjectAltName=" + [...Object.keys(HOSTS), FREE_HOST].map((h) => "DNS:" + h).join(","),
 ], { stdio: "ignore" });
 
-const server = createServer({ key: readFileSync(join(tmp, "key.pem")), cert: readFileSync(join(tmp, "cert.pem")) }, (req, res) => {
+const server = createServer({ key: readFileSync(join(tmp, "key.pem")), cert: readFileSync(join(tmp, "cert.pem")) }, async (req, res) => {
+  if ((req.headers.host || "").startsWith(FREE_HOST) && req.url === "/api/jev" && req.method === "POST") {
+    let raw = "";
+    for await (const c of req) raw += c;
+    return freeTier(req, res, raw);
+  }
   const file = HOSTS[(req.headers.host || "").split(":")[0]];
   if (!file) { res.writeHead(404).end(); return; }
   res.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(readFileSync(join(HERE, "fixtures", file)));
@@ -51,7 +79,7 @@ const server = createServer({ key: readFileSync(join(tmp, "key.pem")), cert: rea
 const chrome = spawn(CHROME, [
   "--headless=new", "--remote-debugging-pipe", "--enable-unsafe-extension-debugging",
   "--user-data-dir=" + join(tmp, "profile"), "--no-first-run", "--window-size=1200,900",
-  "--host-resolver-rules=" + Object.keys(HOSTS).map((h) => `MAP ${h}:443 127.0.0.1:${PORT}`).join(","),
+  "--host-resolver-rules=" + [...Object.keys(HOSTS), FREE_HOST].map((h) => `MAP ${h}:443 127.0.0.1:${PORT}`).join(","),
   "--ignore-certificate-errors", "about:blank",
 ], { stdio: ["ignore", "ignore", "ignore", "pipe", "pipe"] });
 
@@ -120,7 +148,7 @@ try {
     await chrome.storage.local.set({ settings: { ...settings, apiKey: ${JSON.stringify(KEY)},
       goals: "Crack Google interview LeetCode, system design, programming and real tech news." } });
   })()`, swSession);
-  console.log(KEY ? "mode: live Jev via OpenRouter" : "mode: keyword heuristics (set OPENROUTER_API_KEY for live Jev)");
+  console.log(KEY ? "mode: live Jev via OpenRouter" : "mode: free tier (local mock) — set OPENROUTER_API_KEY for live Jev");
 
   const pages = {};
   for (const [host, expected] of Object.entries(EXPECT)) {
@@ -140,6 +168,22 @@ try {
     }
     const siteClass = { "www.youtube.com": "ygf-host--youtube", "x.com": "ygf-host--x", "www.linkedin.com": "ygf-host--linkedin" }[host];
     check(await evaluate(`!!document.querySelector(".${siteClass}")`, s), `blurred items carry ${siteClass}`);
+  }
+
+  if (!KEY) {
+    console.log("\n-- free tier (no key) --");
+    check(freeCalls.length > 0, `the extension called the free tier (${freeCalls.length} calls)`);
+    check(freeCalls.every((c) => /^[0-9a-f-]{36}$/.test(c.install || "")), "every call carries this install's id");
+    check(freeCalls.every((c) => !c.auth), "no Authorization header is sent to the free tier");
+    // First call was a 429: those items got keyword-rule stand-ins, then were asked again after Retry-After.
+    const judged = await waitFor(`(async () => {
+      const all = await chrome.storage.local.get(null);
+      return Object.entries(all).filter(([k, v]) => k.startsWith("v:") && v.d?.source === "jev-free-mock").length >= 8;
+    })()`, swSession, 15000);
+    check(judged, "after the 429 and its Retry-After, all judged items were re-asked and cached from the free tier (8 items)");
+    const st = await evaluate(`chrome.storage.local.get(["freeUsage", "freePausedUntil"])`, swSession);
+    check(st.freePausedUntil > 0, "the 429 paused free calls (freePausedUntil was set)");
+    check(st.freeUsage?.limit === 300 && st.freeUsage.remaining < 300, `remaining allowance is tracked for the popup (${st.freeUsage?.remaining} of ${st.freeUsage?.limit})`);
   }
 
   console.log("\n-- hover on x.com --");
