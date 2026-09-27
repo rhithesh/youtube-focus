@@ -14,6 +14,10 @@ typed answers with calibrated probabilities instead of prose.
    **Run a test call**, then **Save**.
 3. Reload any open YouTube, X or LinkedIn tab.
 
+Turn filtering on or off from the toolbar popup, or from the small switch that floats
+on YouTube, X and LinkedIn pages (drag it anywhere; it remembers where). Hide that
+switch under **Where to filter → Show the on/off switch on the page**.
+
 ## How it judges
 
 Every item in view is reduced to its text — for a video: title, channel, duration,
@@ -86,7 +90,7 @@ invalidates itself. **Clear cached verdicts** in settings forces a re-judge.
 ```
 manifest.json     MV3 manifest
 background.js     batching, Jev calls, verdict logic, cache
-content.js        per-site adapters (YouTube, X, LinkedIn), extraction, blur
+content.js        per-site adapters (YouTube, X, LinkedIn), extraction, blur, on-page switch
 content.css       the blur veil
 options.*         goals, key, surfaces, thresholds, test call
 popup.*           on/off, per-page counts, errors

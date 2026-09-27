@@ -132,11 +132,68 @@ try {
     [offState.hosts === 0, "turning the toggle off clears the ygf-host marker — got " + offState.hosts + " remaining"],
   ];
 
+  // The on-page switch: a real mouse click on it must do what the popup does.
+  const pillState = () => evaluate(`(() => {
+    const h = document.querySelector("[data-ygf-pill]");
+    if (!h) return null;
+    const r = h.shadowRoot, btn = r.querySelector("button"), b = btn.getBoundingClientRect();
+    const l = r.querySelector(".label").getBoundingClientRect(), p = h.getBoundingClientRect();
+    const count = r.querySelector(".count");
+    return { label: r.querySelector(".label").textContent, count: count.hidden ? "" : count.textContent,
+      checked: btn.getAttribute("aria-checked"), bx: b.x + b.width / 2, by: b.y + b.height / 2,
+      lx: l.x + 8, ly: l.y + l.height / 2, px: Math.round(p.x), py: Math.round(p.y),
+      enabled: window.__settings().enabled, veils: document.querySelectorAll(".ygf-veil").length };
+  })()`);
+  const click = async (x, y) => {
+    await send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", buttons: 1, clickCount: 1 });
+    await send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", buttons: 0, clickCount: 1 });
+  };
+
+  await evaluate("window.__setEnabled(true)");
+  await sleep(700);
+  const pOn = await pillState();
+  await click(pOn.bx, pOn.by);
+  await sleep(300);
+  const pOff = await pillState();
+  await click(pOff.bx, pOff.by);
+  await sleep(700);
+  const pBack = await pillState();
+
+  // drag it by the label: it should move, remember where, and not flip the filter
+  await send("Input.dispatchMouseEvent", { type: "mousePressed", x: pBack.lx, y: pBack.ly, button: "left", buttons: 1, clickCount: 1 });
+  for (let i = 1; i <= 8; i++) {
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: pBack.lx + i * 25, y: pBack.ly - i * 20, button: "left", buttons: 1 });
+  }
+  await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: pBack.lx + 200, y: pBack.ly - 160, button: "left", buttons: 0, clickCount: 1 });
+  await sleep(300);
+  const pMoved = await pillState();
+  const savedPos = await evaluate("chrome.storage.local._store.pillPos || null");
+
+  await evaluate(`window.__setSetting("showPagePill", false)`);
+  await sleep(300);
+  const pHidden = await pillState();
+  await evaluate(`window.__setSetting("showPagePill", true)`);
+  await sleep(300);
+  const pShown = await pillState();
+
+  const pillChecks = [
+    [pOn && pOn.checked === "true" && pOn.label === "Filter on", "switch is on the page and reads Filter on"],
+    [pOn && /^\d+ blurred$/.test(pOn.count) && pOn.count !== "0 blurred", "switch shows the blurred count — got " + pOn?.count],
+    [pOff.checked === "false" && pOff.label === "Filter off", "clicking the switch flips it off"],
+    [pOff.enabled === false, "clicking it writes enabled=false to storage, like the popup"],
+    [pOff.veils === 0, "clicking it off clears every veil — got " + pOff.veils],
+    [pBack.enabled === true && pBack.veils > 0, "clicking it on again brings the blur back — got " + pBack.veils + " veils"],
+    [Math.abs(pMoved.px - pBack.px) > 100 && pMoved.py < pBack.py - 80, `dragging moves it (${pBack.px},${pBack.py} → ${pMoved.px},${pMoved.py})`],
+    [pMoved.enabled === true && pMoved.checked === "true", "a drag does not flip the filter"],
+    [savedPos && savedPos.fx > 0 && savedPos.fy < 1, "the dragged position is saved — got " + JSON.stringify(savedPos)],
+    [pHidden === null, "turning the option off removes the switch from the page"],
+    [pShown && Math.abs(pShown.px - pMoved.px) <= 1, "turning it back on restores it where it was dragged"],
+  ];
+
   // Simulate the extension being reloaded/updated out from under this already-open
   // tab, then feed it a brand-new tile so it tries (and fails) to reach the
   // now-severed background. The old bug: this threw "Extension context
   // invalidated" as an uncaught error instead of failing quietly.
-  await evaluate("window.__setEnabled(true)"); // back on, so the new tile is even attempted
   await evaluate("window.__invalidate()");
   await evaluate(`(() => {
     const el = document.createElement("ytd-rich-item-renderer");
@@ -149,20 +206,25 @@ try {
   await sleep(2200); // past the 1.5s safety-net interval + 400ms flush debounce
 
   const orphanVeils = await evaluate(`document.querySelectorAll(".ygf-veil").length`);
+  const orphanPill = await evaluate(`!!document.querySelector("[data-ygf-pill]")`);
   const invalidationChecks = [
     [uncaught.length === 0, "no uncaught errors after the extension is invalidated — got: " + JSON.stringify(uncaught)],
     [orphanVeils === 0, "an orphaned tab clears its own blur — got " + orphanVeils + " veils left"],
+    [!orphanPill, "an orphaned tab removes the on-page switch too"],
   ];
 
   const extra = ["", "-- real pointer input over CDP --",
     ...checks.map(([c, m]) => (c ? "  PASS  " : "  FAIL  ") + m),
     "", "-- toggling off --",
     ...toggleChecks.map(([c, m]) => (c ? "  PASS  " : "  FAIL  ") + m),
+    "", "-- on-page switch --",
+    ...pillChecks.map(([c, m]) => (c ? "  PASS  " : "  FAIL  ") + m),
     "", "-- extension invalidated mid-session --",
     ...invalidationChecks.map(([c, m]) => (c ? "  PASS  " : "  FAIL  ") + m)];
   for (const [c, m] of checks) if (!c) process.exitCode = 1;
   for (const [c, m] of toggleChecks) if (!c) process.exitCode = 1;
   for (const [c, m] of invalidationChecks) if (!c) process.exitCode = 1;
+  for (const [c, m] of pillChecks) if (!c) process.exitCode = 1;
 
   const fails = await evaluate(`window.__report(${JSON.stringify(extra)})`);
   console.log(await evaluate(`document.getElementById("results").textContent`));

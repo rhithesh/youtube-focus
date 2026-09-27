@@ -210,8 +210,9 @@
     clearTimeout(flushTimer);
     if (intervalId) clearInterval(intervalId);
     observer?.disconnect();
-    // Nothing can toggle this tab's blur off any more, so don't leave it behind.
+    // Nothing can toggle this tab's blur off any more, so don't leave it (or the switch) behind.
     resetAll();
+    pill.remove();
   }
 
   function safeSend(msg, cb) {
@@ -260,12 +261,206 @@
     veil.style.setProperty("--ygf-blur", blurPx() + "px");
   }
 
+  /* --------------------------------------------------------- on-page switch */
+
+  // A small draggable pill so the filter can be flipped without opening the popup.
+  // It lives in a shadow root so the host page's CSS can't touch it (and vice versa).
+  const pill = (() => {
+    const MARGIN = 16;
+    let host = null;
+    let els = null;
+    let pos = { fx: 0, fy: 1 }; // 0..1 across the free space; default bottom-left
+    let posLoaded = false;
+
+    const CSS = `
+      :host { all: initial; position: fixed; left: 0; top: 0; z-index: 2147483646; }
+      .pill {
+        display: flex; align-items: center; gap: 9px;
+        padding: 5px 12px 5px 5px;
+        background: #16150f; color: #f3f0e8;
+        border-radius: 999px;
+        font: 500 13px/1 "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        letter-spacing: 0;
+        box-shadow: 0 10px 30px -10px rgba(0,0,0,.5), 0 0 0 1px rgba(243,240,232,.1);
+        cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none;
+        transition: opacity .2s, transform .2s;
+      }
+      .pill.off { opacity: .82; }
+      .pill:hover { opacity: 1; }
+      .pill.dragging { cursor: grabbing; transform: scale(1.04); }
+      .logo { display: block; width: 26px; height: 26px; flex: none; }
+      .label { white-space: nowrap; min-width: 58px; }
+      .count {
+        padding: 3px 7px; border-radius: 999px;
+        background: rgba(243,240,232,.12); color: #c9f25d;
+        font-variant-numeric: tabular-nums;
+      }
+      .count[hidden] { display: none; }
+      button {
+        all: unset; position: relative; flex: none;
+        width: 34px; height: 20px; border-radius: 999px;
+        background: rgba(243,240,232,.22); cursor: pointer;
+        transition: background .2s;
+      }
+      button::after {
+        content: ""; position: absolute; top: 3px; left: 3px;
+        width: 14px; height: 14px; border-radius: 50%;
+        background: #f3f0e8; transition: transform .25s cubic-bezier(.3,1.4,.5,1), background .2s;
+      }
+      button[aria-checked="true"] { background: #c9f25d; }
+      button[aria-checked="true"]::after { transform: translateX(14px); background: #16150f; }
+      button:focus-visible { outline: 2px solid #c9f25d; outline-offset: 2px; }
+    `;
+
+    const LOGO = `<svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
+      <rect width="24" height="24" rx="12" fill="#2a2920"/>
+      <rect x="6" y="6.5" width="12" height="2.4" rx="1.2" fill="#c9f25d"/>
+      <rect x="6" y="10.8" width="12" height="2.4" rx="1.2" fill="#f3f0e8" opacity=".3"/>
+      <rect x="6" y="15.1" width="8" height="2.4" rx="1.2" fill="#c9f25d"/></svg>`;
+
+    function build() {
+      host = document.createElement("div");
+      host.setAttribute("data-ygf-pill", "");
+      const root = host.attachShadow({ mode: "open" });
+      root.innerHTML = `<style>${CSS}</style>
+        <div class="pill" title="Feed Filter · drag to move">
+          ${LOGO}
+          <button role="switch" aria-label="Feed Filter"></button>
+          <span class="label"></span>
+          <span class="count" hidden></span>
+        </div>`;
+      els = {
+        pill: root.querySelector(".pill"),
+        label: root.querySelector(".label"),
+        count: root.querySelector(".count"),
+        button: root.querySelector("button"),
+      };
+
+      let drag = null;
+      let justDragged = false;
+
+      // Move/up are tracked on the window: the pointer leaves a 36px pill almost at once.
+      const move = (e) => {
+        if (!drag || e.pointerId !== drag.id) return;
+        if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 4) return;
+        if (!drag.moved) {
+          drag.moved = true;
+          els.pill.classList.add("dragging");
+        }
+        e.preventDefault();
+        const { w, h } = free();
+        pos = {
+          fx: w > 0 ? clamp01((e.clientX - drag.dx - MARGIN) / w) : 0,
+          fy: h > 0 ? clamp01((e.clientY - drag.dy - MARGIN) / h) : 1,
+        };
+        place();
+      };
+      const end = (e) => {
+        if (!drag || e.pointerId !== drag.id) return;
+        window.removeEventListener("pointermove", move, true);
+        window.removeEventListener("pointerup", end, true);
+        window.removeEventListener("pointercancel", end, true);
+        if (drag.moved) {
+          els.pill.classList.remove("dragging");
+          // A drag that ends over the switch must not also flip it; the click fires right after pointerup.
+          justDragged = true;
+          setTimeout(() => { justDragged = false; }, 0);
+          try { chrome.storage.local.set({ pillPos: pos }); } catch { if (!alive()) die(); }
+        }
+        drag = null;
+      };
+      els.pill.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0) return;
+        const r = host.getBoundingClientRect();
+        drag = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top, x0: e.clientX, y0: e.clientY, moved: false };
+        window.addEventListener("pointermove", move, true);
+        window.addEventListener("pointerup", end, true);
+        window.addEventListener("pointercancel", end, true);
+      });
+
+      els.button.addEventListener("click", () => {
+        if (!justDragged) setEnabled(!settings?.enabled);
+      });
+      window.addEventListener("resize", place);
+    }
+
+    const clamp01 = (n) => Math.min(1, Math.max(0, n));
+
+    function free() {
+      const r = host.getBoundingClientRect();
+      return { w: innerWidth - r.width - 2 * MARGIN, h: innerHeight - r.height - 2 * MARGIN };
+    }
+
+    function place() {
+      if (!host?.isConnected) return;
+      const { w, h } = free();
+      host.style.transform = `translate(${Math.round(MARGIN + pos.fx * Math.max(0, w))}px, ${Math.round(MARGIN + pos.fy * Math.max(0, h))}px)`;
+    }
+
+    function loadPos() {
+      if (posLoaded) return;
+      posLoaded = true;
+      try {
+        chrome.storage.local.get("pillPos", (r) => {
+          try {
+            if (chrome.runtime.lastError) return;
+            if (r?.pillPos) pos = { fx: clamp01(+r.pillPos.fx || 0), fy: clamp01(+r.pillPos.fy || 0) };
+            place();
+          } catch { if (!alive()) die(); }
+        });
+      } catch { if (!alive()) die(); }
+    }
+
+    function render() {
+      const want = !dead && settings && settings.showPagePill !== false && !document.fullscreenElement;
+      if (!want) { host?.remove(); return; }
+      if (!document.body) return;
+      if (!host) build();
+      if (!host.isConnected) {
+        document.body.appendChild(host);
+        loadPos();
+        place();
+      }
+      const on = !!settings.enabled;
+      els.pill.classList.toggle("off", !on);
+      els.button.setAttribute("aria-checked", String(on));
+      els.label.textContent = on ? "Filter on" : "Filter off";
+      els.count.hidden = !on || !blockedCount;
+      els.count.textContent = blockedCount + " blurred";
+    }
+
+    return { render, remove: () => host?.remove() };
+  })();
+
+  // Same single write the popup does: everything else reacts to storage.onChanged.
+  function setEnabled(on) {
+    if (dead || !alive()) { die(); return; }
+    settings = { ...settings, enabled: on };
+    if (!on) {
+      resetAll();
+      blockedCount = 0;
+    }
+    pill.render();
+    try {
+      chrome.storage.local.get("settings", (r) => {
+        try {
+          if (chrome.runtime.lastError) return;
+          chrome.storage.local.set({ settings: { ...(r?.settings || {}), enabled: on } });
+        } catch { if (!alive()) die(); }
+      });
+    } catch { if (!alive()) die(); }
+  }
+
   /* ---------------------------------------------------------------- scanning */
 
   function scan() {
     if (dead) return;
     if (!alive()) { die(); return; }
-    if (!settings || !settings.enabled) return;
+    if (!settings || !settings.enabled) {
+      blockedCount = 0;
+      pill.render();
+      return;
+    }
 
     let blocked = 0;
     for (const el of document.querySelectorAll(site.selector)) {
@@ -302,6 +497,7 @@
     }
 
     blockedCount = blocked;
+    pill.render();
     if (pending.size) scheduleFlush();
   }
 
@@ -351,6 +547,7 @@
     // Safety net for virtualised lists that mutate outside the observed subtree.
     intervalId = setInterval(scan, 1500);
     window.addEventListener("yt-navigate-finish", () => scheduleScan(120));
+    document.addEventListener("fullscreenchange", () => pill.render());
     document.addEventListener("scroll", () => scheduleScan(300), { passive: true });
     scan();
   }

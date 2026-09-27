@@ -10,7 +10,7 @@
 
 import { spawn, execFileSync } from "node:child_process";
 import { createServer } from "node:https";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -153,12 +153,41 @@ try {
   check((await evaluate(veilOpacity, xs)) === "0", "real mouse hover clears the blur");
   check((await evaluate(`getComputedStyle(document.querySelector("#bait > .ygf-veil")).pointerEvents`, xs)) === "none", "cleared blur lets clicks through");
 
+  console.log("\n-- on-page switch --");
+  const pillInfo = `(() => { const h = document.querySelector("[data-ygf-pill]"); if (!h) return null;
+    const r = h.shadowRoot, b = r.querySelector("button").getBoundingClientRect();
+    return { label: r.querySelector(".label").textContent, x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`;
+  for (const [host, s] of Object.entries(pages)) {
+    const p = await evaluate(pillInfo, s);
+    check(p?.label === "Filter on", `${host}: switch is on the page and reads "${p?.label}"`);
+  }
+  const li = pages["www.linkedin.com"];
+  await send("Target.activateTarget", { targetId: (await send("Target.getTargets")).targetInfos.find((t) => t.url.startsWith("https://www.linkedin.com")).targetId });
+  const { data: pillShot } = await send("Page.captureScreenshot", { format: "png" }, li);
+  writeFileSync("/tmp/ygf-pill-linkedin.png", Buffer.from(pillShot, "base64"));
+  const lp = await evaluate(pillInfo, li);
+  const clickAt = async (x, y, s) => {
+    await send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", buttons: 1, clickCount: 1 }, s);
+    await send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", buttons: 0, clickCount: 1 }, s);
+  };
+  await clickAt(lp.x, lp.y, li);
+  await sleep(800);
+  check((await evaluate(`document.querySelectorAll(".ygf-veil").length`, li)) === 0, "clicking it on LinkedIn clears LinkedIn's blur");
+  check((await evaluate(`document.querySelectorAll(".ygf-veil").length`, xs)) === 0, "...and the X tab's too (one shared setting)");
+  check((await evaluate(pillInfo, xs))?.label === "Filter off", "the X tab's switch now reads Filter off");
+  check((await evaluate(`chrome.storage.local.get("settings").then((r) => r.settings.enabled)`, swSession)) === false, "enabled=false is what's stored");
+  const lp2 = await evaluate(pillInfo, li);
+  check(Math.abs(lp2.x - lp.x) < 1, "the switch doesn't move when it flips");
+  await clickAt(lp2.x, lp2.y, li);
+  check(await waitFor(`document.querySelectorAll(".ygf-veil").length > 0`, li, KEY ? 15000 : 6000), "clicking it again brings the blur back");
+
   console.log("\n-- extension reloaded under open tabs --");
   send("Runtime.evaluate", { expression: "chrome.runtime.reload()" }, swSession).catch(() => {});
   await sleep(3000);
   for (const [host, s] of Object.entries(pages)) {
     const left = await evaluate(`document.querySelectorAll(".ygf-veil").length`, s);
     check(left === 0, `${host}: orphaned tab clears its blur (${left} left)`);
+    check(!(await evaluate(`!!document.querySelector("[data-ygf-pill]")`, s)), `${host}: orphaned tab removes its switch`);
   }
   const pageSessions = new Set(Object.values(pages));
   const errors = events.filter((e) => e.method === "Runtime.exceptionThrown" && pageSessions.has(e.sessionId));

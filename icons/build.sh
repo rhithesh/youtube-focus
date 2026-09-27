@@ -6,8 +6,7 @@ CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 [ -x "$CHROME" ] || { echo "Chrome not found at: $CHROME (set CHROME=...)"; exit 2; }
 
 for S in 16 32 48 128; do
-  # 16px gets a chunkier variant: a 1px curved stroke antialiases to pale blue
-  # and the ring all but disappears at that size.
+  # 16px gets a pixel-aligned variant so the three bars stay crisp at that size.
   SRC="icon.svg"; [ "$S" = "16" ] && SRC="icon-small.svg"
   cat > "/tmp/ygf-icon-$S.html" <<HTML
 <!DOCTYPE html><html><head><style>

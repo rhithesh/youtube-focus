@@ -43,8 +43,18 @@
     },
     storage: {
       local: {
+        _store: {},
+        get(key, cb) {
+          const all = { settings: { ...SETTINGS }, ...this._store };
+          const out = typeof key === "string" ? { [key]: all[key] } : all;
+          if (cb) return void setTimeout(() => cb(out), 0);
+          return Promise.resolve(out);
+        },
         set(patch) {
           if (patch.settings) Object.assign(SETTINGS, patch.settings);
+          for (const [k, v] of Object.entries(patch)) if (k !== "settings") this._store[k] = v;
+          // Like real Chrome, a write fires onChanged in every context, the writer's included.
+          setTimeout(() => { for (const fn of chrome.storage.onChanged._listeners) fn(patch, "local"); }, 0);
           return Promise.resolve();
         },
       },
@@ -59,12 +69,14 @@
   // in every other extension context (background, content scripts).
   window.__setEnabled = (v) => {
     chrome.storage.local.set({ settings: { ...SETTINGS, enabled: v } });
-    for (const fn of chrome.storage.onChanged._listeners) fn({ settings: {} }, "local");
   };
 
   // Simulates the extension being reloaded/updated while this tab is still open:
   // chrome.runtime.id disappears and touching chrome.runtime.lastError throws
   // synchronously, exactly like real post-invalidation Chrome.
+  window.__settings = () => SETTINGS;
+  window.__setSetting = (k, v) => chrome.storage.local.set({ settings: { ...SETTINGS, [k]: v } });
+
   window.__invalidate = () => {
     Object.defineProperty(chrome.runtime, "id", { configurable: true, get() { return undefined; } });
     Object.defineProperty(chrome.runtime, "lastError", {

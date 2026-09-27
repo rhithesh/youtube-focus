@@ -1,7 +1,7 @@
 const $ = (sel) => document.querySelector(sel);
 
 const TEXT_FIELDS = ["goals", "apiKey", "model", "provider"];
-const CHECK_FIELDS = ["hideUntilChecked", "fallbackHeuristics"];
+const CHECK_FIELDS = ["hideUntilChecked", "fallbackHeuristics", "showPagePill"];
 const SLIDERS = {
   baitThreshold: { out: "#baitOut", fmt: (v) => Number(v).toFixed(1) + " / 3" },
   offGoalThreshold: { out: "#offGoalOut", fmt: (v) => Number(v).toFixed(1) + " / 3" },

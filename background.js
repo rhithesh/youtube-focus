@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS = {
   hideUntilChecked: false,
   blurStrength: 80, // percent; 100% renders as a 20px blur
   fallbackHeuristics: true,
+  showPagePill: true, // the on/off switch floating on YouTube, X and LinkedIn
 };
 
 // Jev evaluates every question against the state in one parallel pass, so a whole
