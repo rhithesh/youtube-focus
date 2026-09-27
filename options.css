@@ -151,7 +151,10 @@ code { padding: 1px 6px; border-radius: 6px; background: rgba(22, 21, 15, 0.06);
 .hint.inline { display: inline; margin: 0; }
 
 .row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
-.row .field { flex: 1 1 200px; }
+.row .field { flex: 1 1 200px; margin-bottom: 0; }
+.row + .field { margin-top: 18px; }
+/* Same box height for the provider dropdown and the text inputs beside it. */
+input[type="text"], input[type="password"], select { height: 46px; line-height: normal; }
 
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
@@ -201,6 +204,7 @@ footer {
 }
 
 .status { font-size: 14px; color: var(--muted); }
+.status:empty { display: none; }
 .status.ok, .status.err { padding: 4px 12px; border-radius: 999px; color: var(--ink); font-weight: 500; }
 .status.ok { background: var(--lime); }
 .status.err { background: #ffd9cc; }
