@@ -45,6 +45,9 @@ export function Footer() {
           <a href="https://docs.typesafe.ai" target="_blank" rel="noreferrer" className="hover:text-ink">
             TypeSafe Jev
           </a>
+          <a href="/privacy" className="hover:text-ink">
+            Privacy
+          </a>
           <span>Not affiliated with YouTube, X or LinkedIn.</span>
         </div>
       </div>
