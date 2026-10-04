@@ -122,7 +122,7 @@ function PeekVisual() {
 const STEPS = [
   {
     title: "Write what you want.",
-    body: "Plain words, the way you’d tell a friend. It stays in your browser.",
+    body: "Plain words, the way you’d tell a friend. It’s saved in your browser and only sent along with the posts being judged.",
     visual: <GoalVisual />,
     dark: false,
   },
