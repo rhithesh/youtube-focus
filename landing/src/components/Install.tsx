@@ -1,14 +1,11 @@
 "use client";
 
 import { motion } from "motion/react";
+import { SITE } from "@/lib/site";
 import { btn, Kicker, Mark, Reveal } from "./ui";
 
 const STEPS = [
-  <>Download the zip and unzip it.</>,
-  <>
-    Open <code className="rounded bg-ink/5 px-1.5 py-0.5 font-mono text-[13px]">chrome://extensions</code> and turn on Developer mode.
-  </>,
-  <>Click Load unpacked and pick the unzipped folder.</>,
+  <>Open Feed Filter on the Chrome Web Store and click Add to Chrome.</>,
   <>Settings open by themselves. Write your goals and hit Save. An API key is optional.</>,
   <>Reload any open YouTube, X or LinkedIn tab.</>,
 ];
@@ -20,18 +17,18 @@ export function Install() {
         <Reveal>
           <Kicker>Install</Kicker>
           <h2 className="mt-4 font-serif text-[clamp(44px,6.4vw,84px)] leading-[0.95] tracking-[-0.02em]">
-            Two minutes. Then <Mark>forget</Mark> it&rsquo;s there.
+            One click. Then <Mark>forget</Mark> it&rsquo;s there.
           </h2>
           <p className="mt-6 max-w-[440px] text-[17px] leading-relaxed text-muted">
             Works in Chrome, Brave, Edge, Arc and any other Chromium browser. No key needed: the free tier
             judges up to 300 posts a day. Add your own OpenRouter key any time for unlimited.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <a href="/feed-filter.zip" download className={btn.ink}>
-              Download feed-filter.zip
-              <span aria-hidden>↓</span>
+            <a href={SITE.store} target="_blank" rel="noreferrer" className={btn.ink}>
+              Get the extension
+              <span aria-hidden>→</span>
             </a>
-            <a href="https://github.com/rhithesh/youtube-focus" target="_blank" rel="noreferrer" className={btn.ghost}>
+            <a href={SITE.repo} target="_blank" rel="noreferrer" className={btn.ghost}>
               Source on GitHub
             </a>
           </div>

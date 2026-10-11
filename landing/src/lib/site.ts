@@ -15,6 +15,8 @@ export const SITE = {
   description:
     "Free Chrome extension that blurs clickbait, spam and off-topic posts on YouTube, X (Twitter) and LinkedIn, judged against goals you write. Hover any post to see it anyway.",
   version: "1.0.0",
+  // The Chrome Web Store listing. The ID-only form survives a rename of the listing.
+  store: "https://chromewebstore.google.com/detail/mfcjcbmgdedipgjenjcalfmmdnoejaik",
   repo: "https://github.com/rhithesh/youtube-focus",
   author: { name: "rhithesh", url: "https://github.com/rhithesh" },
   keywords: [

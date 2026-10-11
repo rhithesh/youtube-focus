@@ -9,10 +9,13 @@ typed answers with calibrated probabilities instead of prose.
 
 ## Install
 
-1. `chrome://extensions` → enable **Developer mode** → **Load unpacked** → pick this folder.
+1. Add it from the [Chrome Web Store](https://chromewebstore.google.com/detail/mfcjcbmgdedipgjenjcalfmmdnoejaik).
 2. The settings page opens on install. Write your goals, hit **Run a test call**, then
    **Save**. A key is optional: without one, the free tier (below) is used.
 3. Reload any open YouTube, X or LinkedIn tab.
+
+To run from source instead: `chrome://extensions` → enable **Developer mode** →
+**Load unpacked** → pick this folder.
 
 Turn filtering on or off from the toolbar popup, or from the small switch that floats
 on YouTube, X and LinkedIn pages (drag it anywhere; it remembers where). Hide that

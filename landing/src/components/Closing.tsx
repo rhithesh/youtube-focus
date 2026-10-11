@@ -2,6 +2,7 @@
 
 import { motion, useScroll, useTransform } from "motion/react";
 import { useRef } from "react";
+import { SITE } from "@/lib/site";
 import { btn, Logo } from "./ui";
 
 export function FinalCTA() {
@@ -23,8 +24,8 @@ export function FinalCTA() {
           Free, with the source on GitHub. A heavy day of scrolling costs a few cents.
         </p>
         <div className="mt-9 flex justify-center">
-          <a href="#install" className={btn.ink}>
-            Add to Chrome, free
+          <a href={SITE.store} target="_blank" rel="noreferrer" className={btn.ink}>
+            Get the extension
             <span aria-hidden>→</span>
           </a>
         </div>

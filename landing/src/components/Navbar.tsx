@@ -2,6 +2,7 @@
 
 import { motion, useMotionValueEvent, useScroll } from "motion/react";
 import { useState } from "react";
+import { SITE } from "@/lib/site";
 import { btn, Logo } from "./ui";
 
 const LINKS = [
@@ -37,8 +38,8 @@ export function Navbar() {
             </a>
           ))}
         </nav>
-        <a href="#install" className={`${btn.ink} px-4 py-2.5 text-[14px]`}>
-          Get it free
+        <a href={SITE.store} target="_blank" rel="noreferrer" className={`${btn.ink} px-4 py-2.5 text-[14px]`}>
+          Get the extension
         </a>
       </motion.header>
     </div>

@@ -11,6 +11,7 @@ import {
 } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { HERO_GOAL, ITEMS, WALL, WALL_NOISE, WALL_TOTAL, isNoise } from "@/lib/feed";
+import { SITE } from "@/lib/site";
 import { FeedCard } from "./FeedCard";
 import { btn, Glyph } from "./ui";
 
@@ -157,8 +158,8 @@ export function Hero() {
         </p>
 
         <div className="ff-rise mt-9 flex flex-wrap justify-center gap-3" style={{ "--d": "0.38s" } as React.CSSProperties}>
-          <a href="#install" className={btn.ink}>
-            Add to Chrome, free
+          <a href={SITE.store} target="_blank" rel="noreferrer" className={btn.ink}>
+            Get the extension
             <span aria-hidden>→</span>
           </a>
           <a href="#how" className={btn.ghost}>
