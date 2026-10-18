@@ -38,6 +38,39 @@ const EXPECT = {
 
 const FREE_HOST = "feed-filter-two.vercel.app";
 const freeCalls = [];
+// The image pass loads pictures from these; here they get a 128px PNG, which the extension
+// has to scale up to Jev's 280px minimum and re-encode as JPEG.
+const IMAGE_HOSTS = ["i.ytimg.com", "pbs.twimg.com"];
+const imageGets = [];
+const lookCalls = [];
+
+// Width and height from a baseline or progressive JPEG's SOF marker.
+function jpegSize(buf) {
+  for (let i = 2; i < buf.length - 9; ) {
+    if (buf[i] !== 0xff) return null;
+    const marker = buf[i + 1];
+    if (marker >= 0xc0 && marker <= 0xc2) return { h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) };
+    i += 2 + buf.readUInt16BE(i + 2);
+  }
+  return null;
+}
+
+// Stand-in for landing/src/app/api/jev/look: the clean video's thumbnail is bait, and the
+// picture-only X post is a scam graphic.
+function freeLook(req, res, raw) {
+  const body = JSON.parse(raw);
+  const answers = {};
+  const sizes = [];
+  for (const [k, item] of Object.entries(body.state.items)) {
+    const url = item.image?.image_url?.url || "";
+    sizes.push(url.startsWith("data:image/jpeg;base64,") ? jpegSize(Buffer.from(url.split(",")[1], "base64")) : null);
+    answers[k + "_look"] = { score: /URL Shortener/.test(item.title || "") ? 2.9 : 0.3, confidence: 0.92 };
+    answers[k + "_scam"] = { noul: item.text === "" ? 0.97 : 0.02 };
+    if (k + "_goal" in body.questions) answers[k + "_goal"] = { score: 0.5, confidence: 0.9 };
+  }
+  lookCalls.push({ install: req.headers["x-feed-filter-install"], auth: req.headers.authorization, raw, sizes, body });
+  res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ answers, model: "jev-look-mock" }));
+}
 
 // Stand-in for landing/src/app/api/jev: the first call is over the limit, the rest get answers.
 function freeTier(req, res, raw) {
@@ -62,7 +95,7 @@ const tmp = mkdtempSync(join(tmpdir(), "ygf-e2e-"));
 execFileSync("openssl", [
   "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
   "-keyout", join(tmp, "key.pem"), "-out", join(tmp, "cert.pem"),
-  "-subj", "/CN=feed-filter-test", "-addext", "subjectAltName=" + [...Object.keys(HOSTS), FREE_HOST].map((h) => "DNS:" + h).join(","),
+  "-subj", "/CN=feed-filter-test", "-addext", "subjectAltName=" + [...Object.keys(HOSTS), FREE_HOST, ...IMAGE_HOSTS].map((h) => "DNS:" + h).join(","),
 ], { stdio: "ignore" });
 
 const server = createServer({ key: readFileSync(join(tmp, "key.pem")), cert: readFileSync(join(tmp, "cert.pem")) }, async (req, res) => {
@@ -70,6 +103,17 @@ const server = createServer({ key: readFileSync(join(tmp, "key.pem")), cert: rea
     let raw = "";
     for await (const c of req) raw += c;
     return freeTier(req, res, raw);
+  }
+  if ((req.headers.host || "").startsWith(FREE_HOST) && req.url === "/api/jev/look" && req.method === "POST") {
+    let raw = "";
+    for await (const c of req) raw += c;
+    return freeLook(req, res, raw);
+  }
+  if (IMAGE_HOSTS.some((h) => (req.headers.host || "").startsWith(h))) {
+    // The page's own <img> loads land here too; only the extension's fetches carry its origin.
+    if ((req.headers.origin || "").startsWith("chrome-extension://")) imageGets.push((req.headers.host || "").split(":")[0] + req.url);
+    res.writeHead(200, { "content-type": "image/png", "access-control-allow-origin": "*" }).end(readFileSync(join(EXT, "icons", "icon128.png")));
+    return;
   }
   const file = HOSTS[(req.headers.host || "").split(":")[0]];
   if (!file) { res.writeHead(404).end(); return; }
@@ -79,7 +123,7 @@ const server = createServer({ key: readFileSync(join(tmp, "key.pem")), cert: rea
 const chrome = spawn(CHROME, [
   "--headless=new", "--remote-debugging-pipe", "--enable-unsafe-extension-debugging",
   "--user-data-dir=" + join(tmp, "profile"), "--no-first-run", "--window-size=1200,900",
-  "--host-resolver-rules=" + [...Object.keys(HOSTS), FREE_HOST].map((h) => `MAP ${h}:443 127.0.0.1:${PORT}`).join(","),
+  "--host-resolver-rules=" + [...Object.keys(HOSTS), FREE_HOST, ...IMAGE_HOSTS].map((h) => `MAP ${h}:443 127.0.0.1:${PORT}`).join(","),
   "--ignore-certificate-errors", "about:blank",
 ], { stdio: ["ignore", "ignore", "ignore", "pipe", "pipe"] });
 
@@ -224,6 +268,30 @@ try {
   check(Math.abs(lp2.x - lp.x) < 1, "the switch doesn't move when it flips");
   await clickAt(lp2.x, lp2.y, li);
   check(await waitFor(`document.querySelectorAll(".ygf-veil").length > 0`, li, KEY ? 15000 : 6000), "clicking it again brings the blur back");
+
+  if (!KEY) {
+    console.log("\n-- image pass (thumbnails and post pictures) --");
+    check(lookCalls.length === 0 && imageGets.length === 0, "with picture checks off, no picture is loaded or sent");
+    await evaluate(`chrome.storage.local.get("settings").then(({ settings }) => chrome.storage.local.set({ settings: { ...settings, enabled: true, lookAtImages: true } }))`, swSession);
+    const yt = pages["www.youtube.com"];
+    check(await waitFor(`!!document.querySelector("#clean > .ygf-veil")`, yt, 15000), "YouTube: a clean title with a bait thumbnail gets blurred once its picture is judged");
+    check(await evaluate(`!!document.querySelector("#bait > .ygf-veil")`, yt), "YouTube: the text-bait video stays blurred");
+    check(await waitFor(`!!document.querySelector("#media > .ygf-veil")`, xs, 15000), "X: a picture-only post is now judged, and its scam graphic blurred");
+    check(imageGets.some((u) => u === "i.ytimg.com/vi/bbbbbbbbbbb/hqdefault.jpg"), "YouTube thumbnails come from i.ytimg.com by video id");
+    check(imageGets.some((u) => u.startsWith("pbs.twimg.com/media/") && u.includes("format=jpg") && u.includes("name=small")), "X pictures are asked for as small JPEGs (" + imageGets.find((u) => u.startsWith("pbs")) + ")");
+    check(imageGets.length === new Set(imageGets).size, "each picture is loaded once");
+    const sizes = lookCalls.flatMap((c) => c.sizes);
+    check(sizes.length > 0 && sizes.every((d) => d && d.w >= 280 && d.h >= 280 && d.w <= 1568 && d.h <= 1568), "every picture reaches Jev as a JPEG within 280-1568px (" + sizes.map((d) => d && d.w + "x" + d.h).join(", ") + ")");
+    check(lookCalls.every((c) => !/https?:\/\//.test(c.raw)), "no picture URL is sent, only the picture");
+    check(lookCalls.every((c) => /^[0-9a-f-]{36}$/.test(c.install || "") && !c.auth), "image calls carry the install id and no Authorization header");
+    check(lookCalls.every((c) => Object.keys(c.body.state.items).length <= 10), "at most 10 pictures per request");
+    const cachedLooks = await evaluate(`chrome.storage.local.get(null).then((all) => Object.keys(all).filter((k) => k.startsWith("i:")))`, swSession);
+    check(cachedLooks.includes("i:bbbbbbbbbbb") && cachedLooks.includes("i:x:1790000000000000004"), "picture verdicts are cached (" + cachedLooks.length + ")");
+    const calls = lookCalls.length;
+    await send("Page.reload", {}, yt);
+    check(await waitFor(`!!document.querySelector("#clean > .ygf-veil")`, yt, 8000), "after a reload the cached picture verdict blurs straight away");
+    check(lookCalls.length === calls, "...without asking Jev again");
+  }
 
   console.log("\n-- extension reloaded under open tabs --");
   send("Runtime.evaluate", { expression: "chrome.runtime.reload()" }, swSession).catch(() => {});

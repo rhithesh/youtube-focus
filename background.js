@@ -11,6 +11,11 @@ const ENDPOINTS = {
 // which forwards it to Jev with the project's own key. (Also listed in host_permissions.)
 const FREE_ENDPOINT = "https://feed-filter-two.vercel.app/api/jev";
 
+// Requests with images. OpenRouter takes them on its Decisions route as data-URL image
+// parts; TypeSafe direct takes them on System One as an assets map behind an opt-in header.
+const DECISIONS_ENDPOINT = "https://openrouter.ai/api/alpha/decisions";
+const FREE_LOOK_ENDPOINT = FREE_ENDPOINT + "/look";
+
 const DEFAULT_SETTINGS = {
   enabled: true,
   provider: "openrouter",
@@ -28,6 +33,7 @@ const DEFAULT_SETTINGS = {
   fallbackHeuristics: true,
   freeTier: true, // use the free tier when no key is set
   showPagePill: true, // the on/off switch floating on YouTube, X and LinkedIn
+  lookAtImages: false, // also judge thumbnails and post images (Jev's image input is still experimental)
 };
 
 // Jev evaluates every question against the state in one parallel pass, so a whole
@@ -55,6 +61,19 @@ const JUNK_TRUE =
   "Spam, a scam, or mass-produced filler: crypto and get-rich-quick pitches, fake giveaways, engagement farming, generic AI-written filler, stolen or re-uploaded content, misleading medical or financial claims, or an account pumping out near-identical posts or videos.";
 const JUNK_FALSE =
   "A genuine post or video from a real person or channel, whatever its quality or subject.";
+
+// The image pass asks about the picture, with the title or text alongside for context.
+const LOOK_LEVELS = [
+  "A plain picture. It shows what the video or post is about, with no attention tricks.",
+  "Styled to stand out: bright colours, a big face or a few bold words, but it honestly matches the title or text.",
+  "Clear visual bait: exaggerated shocked or crying faces, red arrows and circles, huge ALL-CAPS overlay text, blurred or censored 'reveals', fake urgency, or a promise the title doesn't deliver.",
+  "Pure visual bait or a lie: fake or doctored screenshots, invented drama, sexualised or gory bait, or a picture that has nothing to do with the actual content.",
+];
+
+const SCAM_IMAGE_TRUE =
+  "The picture pushes a scam or spam: fake giveaways, crypto or get-rich-quick promises, screenshots of fake earnings or payouts, fake celebrity endorsements, or 'DM me' and 'link in bio' lead-generation graphics.";
+const SCAM_IMAGE_FALSE =
+  "An ordinary picture: a photo, chart, screenshot, product shot, slide or video thumbnail, whatever its quality.";
 
 const PLATFORM = { youtube: "YouTube", x: "X (Twitter)", linkedin: "LinkedIn" };
 
@@ -89,25 +108,28 @@ function rubricStamp(s) {
 
 /* ------------------------------------------------------------------- cache */
 
-async function readCache(ids, stamp) {
-  const keys = ids.map((id) => "v:" + id);
+// "v:" holds text verdicts, "i:" image-pass verdicts.
+async function readCache(ids, stamp, prefix = "v:") {
+  const keys = ids.map((id) => prefix + id);
   const got = await chrome.storage.local.get(keys);
   const hits = {};
   const now = Date.now();
   for (const id of ids) {
-    const e = got["v:" + id];
+    const e = got[prefix + id];
     if (e && e.s === stamp && now - e.t < CACHE_TTL_MS) hits[id] = e.d;
   }
   return hits;
 }
 
-async function writeCache(verdicts, stamp) {
+async function writeCache(verdicts, stamp, prefix = "v:") {
   const patch = {};
   const t = Date.now();
-  for (const [id, d] of Object.entries(verdicts)) patch["v:" + id] = { d, s: stamp, t };
+  for (const [id, d] of Object.entries(verdicts)) patch[prefix + id] = { d, s: stamp, t };
   await chrome.storage.local.set(patch);
   maybePrune();
 }
+
+const isVerdictKey = (k) => k.startsWith("v:") || k.startsWith("i:");
 
 let pruning = false;
 async function maybePrune() {
@@ -115,7 +137,7 @@ async function maybePrune() {
   pruning = true;
   try {
     const all = await chrome.storage.local.get(null);
-    const entries = Object.entries(all).filter(([k]) => k.startsWith("v:"));
+    const entries = Object.entries(all).filter(([k]) => isVerdictKey(k));
     if (entries.length <= CACHE_LIMIT) return;
     entries.sort((a, b) => (a[1]?.t || 0) - (b[1]?.t || 0));
     const drop = entries.slice(0, entries.length - Math.floor(CACHE_LIMIT * 0.8)).map(([k]) => k);
@@ -195,6 +217,162 @@ function buildRequest(videos, s) {
   return { model: s.model, state, questions };
 }
 
+/* ----------------------------------------------------------- image pass */
+
+// Jev reads images in long-context mode, which TypeSafe says is slower and less accurate,
+// so pictures go in a request of their own and the text verdicts keep full accuracy.
+// The pass can add a blur (thumbnail bait, a scam graphic) but never lifts one.
+const LOOK_BATCH = 10;
+const LOOK_VERSION = 1;
+const IMAGE_HOSTS = /^https:\/\/(i\.ytimg\.com|pbs\.twimg\.com|media\.licdn\.com)\//;
+const IMG_MIN = 280; // Jev takes 280-1568 px a side
+const IMG_MAX = 768; // and bills images as input tokens, so keep them small
+
+function lookStamp(s) {
+  return hash32(["look", LOOK_VERSION, s.goals, s.model, s.baitThreshold, s.offGoalThreshold, s.junkThreshold, s.minConfidence].join("|"));
+}
+
+function toBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+// These CDNs answer with Access-Control-Allow-Origin: *, so no extra host permission is needed.
+// Every picture is re-encoded as a baseline JPEG inside Jev's size limits (WebP, tiny avatars
+// and banners would otherwise be rejected), and the URL itself is never sent anywhere.
+async function loadImage(url) {
+  if (!IMAGE_HOSTS.test(url || "")) return null;
+  try {
+    const res = await fetch(url, { credentials: "omit", signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const bmp = await createImageBitmap(await res.blob());
+    const scale = Math.max(Math.min(1, IMG_MAX / Math.max(bmp.width, bmp.height)), IMG_MIN / Math.min(bmp.width, bmp.height));
+    const w = Math.max(IMG_MIN, Math.round(bmp.width * scale));
+    const h = Math.max(IMG_MIN, Math.round(bmp.height * scale));
+    if (Math.max(w, h) > 1568) return bmp.close(), null; // a long, thin banner: nothing worth judging
+    const canvas = new OffscreenCanvas(w, h);
+    canvas.getContext("2d").drawImage(bmp, 0, 0, w, h);
+    bmp.close();
+    const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.82 });
+    return toBase64(await blob.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+// Images are written as reference strings here; toWire() swaps them for whatever the
+// destination expects. A reference has to be text that can't occur by accident.
+function buildLookRequest(items, s) {
+  const state = {
+    my_goals: s.goals?.trim() || "(the viewer has not stated any goals)",
+    items: {},
+  };
+  const questions = {};
+  const images = {};
+
+  items.forEach((v, i) => {
+    const k = "v" + i;
+    const ref = "img-" + crypto.randomUUID();
+    images[ref] = v.imageData;
+    state.items[k] = { ...describe(v), image: ref };
+
+    questions[k + "_look"] = {
+      type: "score",
+      instructions: {
+        item: "items." + k,
+        question:
+          "Rate how much the picture at `items." + k + ".image` relies on visual clickbait to win the click. " +
+          "Judge the picture together with the item's title or text, as someone scrolling past sees it.",
+      },
+      criteria: LOOK_LEVELS,
+    };
+
+    questions[k + "_scam"] = {
+      type: "noul",
+      instructions: {
+        item: "items." + k,
+        question: "The picture at `items." + k + ".image` is part of a scam or spam.",
+      },
+      criteria: { true: SCAM_IMAGE_TRUE, false: SCAM_IMAGE_FALSE },
+    };
+
+    // A post that is only a picture never went through the text pass, so judge its subject here.
+    if (!v.title) {
+      questions[k + "_goal"] = {
+        type: "score",
+        instructions: {
+          item: "items." + k,
+          question:
+            "The viewer's own goals are in `my_goals`. Rate how far the picture at `items." + k +
+            ".image` sits from those goals. Judge the subject matter, not the production quality.",
+        },
+        criteria: GOAL_LEVELS,
+      };
+    }
+  });
+
+  return { model: s.model, state, questions, images };
+}
+
+// "jev-latest" and "jev-1.14.0" are System One names; the Decisions route wants OpenRouter's.
+function decisionsModel(m) {
+  if (m.includes("/")) return m;
+  if (m === "jev-latest") return "~typesafe/jev-latest";
+  return "typesafe/" + m.replace(/^(jev-\d+\.\d+)\.\d+$/, "$1");
+}
+
+function toWire({ model, state, questions, images }, format) {
+  if (format === "assets") {
+    const assets = {};
+    for (const [ref, data] of Object.entries(images)) assets[ref] = { type: "image", format: "jpg", data_base64: data };
+    return { model, state, questions, assets };
+  }
+  // Decisions: the image part goes where the reference was.
+  const items = {};
+  for (const [k, it] of Object.entries(state.items)) {
+    items[k] = { ...it, image: { type: "image_url", image_url: { url: "data:image/jpeg;base64," + images[it.image] } } };
+  }
+  return { model: decisionsModel(model), state: { ...state, items }, questions };
+}
+
+async function callLook(body, s) {
+  if (!s.apiKey) return callFree(toWire(body, "decisions"), FREE_LOOK_ENDPOINT);
+  if (s.provider === "typesafe") {
+    return callJev(toWire(body, "assets"), s, 0, ENDPOINTS.typesafe, { "TypeSafe-Danger-Zone-Images": "true" });
+  }
+  return callJev(toWire(body, "decisions"), s, 0, DECISIONS_ENDPOINT);
+}
+
+function lookVerdictFrom(answers, k, s, source) {
+  const look = answers[k + "_look"] || {};
+  const scam = answers[k + "_scam"] || {};
+  const goal = answers[k + "_goal"];
+
+  const l = Number(look.score ?? 0);
+  const lc = Number(look.confidence ?? 0);
+  const j = Number(scam.noul ?? 0);
+  const scores = { look: round2(l), lookConf: round2(lc), scam: round2(j) };
+  if (goal) Object.assign(scores, { goal: round2(Number(goal.score ?? 0)), goalConf: round2(Number(goal.confidence ?? 0)) });
+
+  if (j >= s.junkThreshold) return { tag: "SPAM", why: "scam image " + pct(j), scores, source };
+  if (l >= s.baitThreshold && lc >= s.minConfidence)
+    return { tag: "CLICK-BAIT", why: "thumbnail bait " + scores.look + "/3 · " + pct(lc) + " conf", scores, source };
+  if (goal && s.goals?.trim() && scores.goal >= s.offGoalThreshold && scores.goalConf >= s.minConfidence)
+    return { tag: "OFF-GOAL", why: "off-goal " + scores.goal + "/3 · " + pct(scores.goalConf) + " conf", scores, source };
+  return { tag: null, why: "", scores, source };
+}
+
+// The text verdict decides first; the picture can only add a reason to blur.
+function combine(text, look) {
+  if (!look) return text;
+  if (!text) return look;
+  const scores = { ...text.scores, ...look.scores };
+  if (text.tag || !look.tag) return { ...text, scores };
+  return { ...look, scores };
+}
+
 class FreeTierError extends Error {
   constructor(message, retryAfterSec) {
     super(message);
@@ -211,10 +389,10 @@ async function installId() {
 }
 
 // The free tier's own limits are final: no retrying a 429 from it, just back off until it resets.
-async function callFree(body) {
+async function callFree(body, endpoint = FREE_ENDPOINT) {
   let res;
   try {
-    res = await fetch(FREE_ENDPOINT, {
+    res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Feed-Filter-Install": await installId() },
       body: JSON.stringify(body),
@@ -239,15 +417,14 @@ async function callFree(body) {
 
   const limit = Number(res.headers.get("x-ratelimit-limit"));
   const remaining = Number(res.headers.get("x-ratelimit-remaining"));
-  if (Number.isFinite(limit) && Number.isFinite(remaining)) {
+  if (endpoint === FREE_ENDPOINT && Number.isFinite(limit) && Number.isFinite(remaining)) {
     await chrome.storage.local.set({ freeUsage: { limit, remaining, at: Date.now() } });
   }
   return res.json();
 }
 
-async function callJev(body, s, attempt = 0) {
+async function callJev(body, s, attempt = 0, url = ENDPOINTS[s.provider] || ENDPOINTS.openrouter, extraHeaders = {}) {
   if (!s.apiKey) return callFree(body);
-  const url = ENDPOINTS[s.provider] || ENDPOINTS.openrouter;
   let res;
   try {
     res = await fetch(url, {
@@ -255,6 +432,7 @@ async function callJev(body, s, attempt = 0) {
       headers: {
         Authorization: "Bearer " + s.apiKey,
         "Content-Type": "application/json",
+        ...extraHeaders,
       },
       body: JSON.stringify(body),
     });
@@ -267,7 +445,7 @@ async function callJev(body, s, attempt = 0) {
     const retryAfter = Number(res.headers.get("retry-after"));
     const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 500 * 2 ** attempt;
     await new Promise((r) => setTimeout(r, waitMs));
-    return callJev(body, s, attempt + 1);
+    return callJev(body, s, attempt + 1, url, extraHeaders);
   }
 
   if (!res.ok) {
@@ -357,10 +535,19 @@ function heuristicVerdict(v, s) {
 
 /* ----------------------------------------------------------------- judging */
 
-async function handleJudge(videos) {
+async function handleJudge(videos, tabId) {
   const s = await getSettings();
   if (!s.enabled) return { verdicts: {}, settings: s };
 
+  // Picture-only posts are sent only while the image pass is on, and skip the text pass.
+  const res = await judgeText(videos.filter((v) => v.title), s);
+  const pictures = s.lookAtImages ? videos.filter((v) => v.image) : [];
+  if (!pictures.length) return res;
+  return { ...res, verdicts: await withLooks(pictures, s, res.verdicts, tabId) };
+}
+
+async function judgeText(videos, s) {
+  if (!videos.length) return { verdicts: {}, settings: s };
   const stamp = rubricStamp(s);
   const ids = videos.map((v) => v.id);
   const cached = await readCache(ids, stamp);
@@ -423,6 +610,72 @@ async function handleJudge(videos) {
   return { verdicts: heuristicsFor(todo, fresh, retryAt), settings: s, error };
 }
 
+/* ------------------------------------------------------- judging pictures */
+
+const lookInFlight = new Set();
+let lookPausedUntil = 0;
+
+// Cached picture verdicts are merged in straight away. The rest are judged in the
+// background and pushed to the tab when they land, since image requests are slower.
+async function withLooks(items, s, verdicts, tabId) {
+  const stamp = lookStamp(s);
+  const cached = await readCache(items.map((v) => v.id), stamp, "i:");
+  const out = { ...verdicts };
+  const retryAt = Math.max(lookPausedUntil, Date.now() + 60_000);
+  for (const v of items) {
+    if (v.id in cached) out[v.id] = combine(verdicts[v.id], cached[v.id]);
+    // A picture-only post has nothing to show until its picture is judged; ask again later
+    // in case the result never arrives (the tab reloaded, the worker restarted).
+    else if (!out[v.id]) out[v.id] = { tag: null, why: "", scores: {}, source: "image", provisional: true, retryAt };
+  }
+
+  const todo = items.filter((v) => !(v.id in cached) && !lookInFlight.has(v.id));
+  if (todo.length && Date.now() >= lookPausedUntil) judgePictures(todo, s, stamp, verdicts, tabId);
+  return out;
+}
+
+async function judgePictures(items, s, stamp, textVerdicts, tabId) {
+  items.forEach((v) => lookInFlight.add(v.id));
+  try {
+    const loaded = await Promise.all(items.map(async (v) => ({ ...v, imageData: await loadImage(v.image) })));
+    const ready = loaded.filter((v) => v.imageData);
+    const chunks = [];
+    for (let i = 0; i < ready.length; i += LOOK_BATCH) chunks.push(ready.slice(i, i + LOOK_BATCH));
+
+    const fresh = {};
+    let error = null;
+    const results = await Promise.allSettled(
+      chunks.map(async (chunk) => {
+        const data = await callLook(buildLookRequest(chunk, s), s);
+        const answers = data.answers || {};
+        chunk.forEach((v, idx) => {
+          fresh[v.id] = lookVerdictFrom(answers, "v" + idx, s, (data.model || s.model) + " · image");
+        });
+      })
+    );
+    for (const r of results) {
+      if (r.status !== "rejected") continue;
+      error = String(r.reason?.message || r.reason);
+      if (r.reason instanceof FreeTierError) lookPausedUntil = Date.now() + r.reason.retryAfterSec * 1000;
+    }
+    if (Object.keys(fresh).length) await writeCache(fresh, stamp, "i:");
+    if (error) await chrome.storage.local.set({ lastError: { msg: "Images: " + error, at: Date.now() } });
+
+    // A picture that couldn't be loaded leaves the text verdict as it was, and lets a
+    // picture-only post through. One whose request failed is asked about again later.
+    const push = {};
+    for (const v of loaded) {
+      if (fresh[v.id]) push[v.id] = combine(textVerdicts[v.id], fresh[v.id]);
+      else if (!textVerdicts[v.id] && !v.imageData) push[v.id] = { tag: null, why: "", scores: {}, source: "image" };
+    }
+    if (tabId != null && Object.keys(push).length) {
+      await chrome.tabs.sendMessage(tabId, { type: "verdicts", verdicts: push }).catch(() => {});
+    }
+  } finally {
+    items.forEach((v) => lookInFlight.delete(v.id));
+  }
+}
+
 /* -------------------------------------------------------------- test call */
 
 async function handleTest(goals) {
@@ -448,7 +701,27 @@ async function handleTest(goals) {
       model: data.model,
       usage: data.usage,
       rows: samples.map((v, i) => ({ title: v.title, ...verdictFrom(answers, "v" + i, s, data.model) })),
+      look: s.lookAtImages ? await testLook(s) : undefined,
     };
+  } catch (e) {
+    return { ok: false, error: String(e.message || e), ms: Date.now() - t0 };
+  }
+}
+
+// One real thumbnail through the same route the feed uses, so a provider that can't take
+// images shows up here rather than as silence on the page.
+async function testLook(s) {
+  const t0 = Date.now();
+  const sample = {
+    id: "t-img", platform: "youtube", title: "Rick Astley - Never Gonna Give You Up (Official Video)",
+    author: "Rick Astley", duration: "3:33", meta: "1.6B views · 16 years ago",
+    image: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+  };
+  const imageData = await loadImage(sample.image);
+  if (!imageData) return { ok: false, error: "Couldn't load the sample thumbnail from i.ytimg.com." };
+  try {
+    const data = await callLook(buildLookRequest([{ ...sample, imageData }], s), s);
+    return { ok: true, ms: Date.now() - t0, model: data.model, usage: data.usage, row: { title: sample.title, ...lookVerdictFrom(data.answers || {}, "v0", s, data.model) } };
   } catch (e) {
     return { ok: false, error: String(e.message || e), ms: Date.now() - t0 };
   }
@@ -456,9 +729,9 @@ async function handleTest(goals) {
 
 /* ---------------------------------------------------------------- plumbing */
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "judge") {
-    handleJudge(msg.videos || [])
+    handleJudge(msg.videos || [], sender.tab?.id)
       .then(sendResponse)
       .catch((e) => sendResponse({ verdicts: {}, error: String(e.message || e) }));
     return true;
@@ -474,7 +747,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "clearCache") {
     chrome.storage.local
       .get(null)
-      .then((all) => chrome.storage.local.remove(Object.keys(all).filter((k) => k.startsWith("v:"))))
+      .then((all) => chrome.storage.local.remove(Object.keys(all).filter(isVerdictKey)))
       .then(() => sendResponse({ ok: true }));
     return true;
   }
@@ -488,4 +761,4 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
 });
 
 // Exported for the offline shape test in test/validate.mjs. Unused at runtime.
-export { buildRequest, verdictFrom, heuristicVerdict, DEFAULT_SETTINGS };
+export { buildRequest, verdictFrom, heuristicVerdict, buildLookRequest, toWire, lookVerdictFrom, combine, decisionsModel, DEFAULT_SETTINGS };

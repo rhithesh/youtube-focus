@@ -51,7 +51,7 @@
       <input id="apiKey" type="password" spellcheck="false" autocomplete="off" placeholder="Leave empty to use the free tier">
       <span class="hint">Stored in this browser only (<code>chrome.storage.local</code>) and sent to the provider endpoint, nowhere else. Input is billed at $0.042 / Mtok; output is free. A full feed page costs a fraction of a cent.</span>
     </label>
-    <label class="check block"><input id="freeTier" type="checkbox"> Use the free tier when no key is set <span class="hint inline">(post text and your goals pass through Feed Filter&rsquo;s server on the way to Jev; nothing is stored)</span></label>
+    <label class="check block"><input id="freeTier" type="checkbox"> Use the free tier when no key is set <span class="hint inline">(post text, your goals and, with picture checks on, the pictures pass through Feed Filter&rsquo;s server on the way to Jev; nothing is stored)</span></label>
     <div class="row">
       <button id="test" class="btn">Run a test call</button>
       <label class="check"><input id="fallbackHeuristics" type="checkbox"> Fall back to keyword rules when the model can&rsquo;t be reached</label>
@@ -74,6 +74,7 @@
       <label class="check"><input type="checkbox" data-surface="linkedin"> LinkedIn feed</label>
     </div>
     <label class="check block"><input id="hideUntilChecked" type="checkbox"> Blur every item until it has been judged <span class="hint inline">(no flash of clickbait, but the feed fills in a beat slower)</span></label>
+    <label class="check block"><input id="lookAtImages" type="checkbox"> Also judge thumbnails and post pictures <span class="hint inline">(experimental: Jev&rsquo;s image input is new. Catches bait thumbnails, scam graphics and picture-only posts. Pictures are judged a moment after the text, so a blur can land a beat late.)</span></label>
     <label class="check block"><input id="showPagePill" type="checkbox"> Show the on/off switch on the page <span class="hint inline">(a small pill on YouTube, X and LinkedIn; drag it anywhere)</span></label>
   </section>
 

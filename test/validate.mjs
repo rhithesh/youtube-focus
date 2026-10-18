@@ -5,7 +5,8 @@ globalThis.chrome = {
   runtime: { onMessage: { addListener() {} }, onInstalled: { addListener() {} }, openOptionsPage() {} },
 };
 
-const { buildRequest, verdictFrom, heuristicVerdict, DEFAULT_SETTINGS } = await import("../background.js");
+const { buildRequest, verdictFrom, heuristicVerdict, buildLookRequest, toWire, lookVerdictFrom, combine, decisionsModel, DEFAULT_SETTINGS } =
+  await import("../background.js");
 
 let fails = 0;
 const ok = (cond, msg) => { console.log((cond ? "  PASS  " : "  FAIL  ") + msg); if (!cond) fails++; };
@@ -74,6 +75,46 @@ ok(heuristicVerdict({ title: "Make $5000 a day with this FREE crypto airdrop" },
 ok(heuristicVerdict(videos[3], s).tag === "CLICK-BAIT", "LinkedIn broetry ending in 'Agree?' -> CLICK-BAIT");
 ok(heuristicVerdict(videos[2], s).tag === null, "plain technical X post -> allowed");
 ok(heuristicVerdict({ title: "99% of developers don't know these VS Code tricks. The 4th one will blow your mind 🤯🧵" }, s).tag === "CLICK-BAIT", "X thread bait -> CLICK-BAIT");
+
+console.log("\n-- image pass --");
+ok(DEFAULT_SETTINGS.lookAtImages === false, "image pass is off by default (Jev's image input is experimental)");
+const pics = [
+  { ...videos[0], imageData: "AAAA" },
+  { id: "x:1790000000000000009", platform: "x", title: "", author: "Photo Account", meta: "", imageData: "BBBB" },
+];
+const look = buildLookRequest(pics, s);
+const refs = Object.keys(look.images);
+ok(refs.length === 2 && refs.every((r) => /^img-[0-9a-f-]{36}$/.test(r)), "one fresh UUID reference per picture");
+ok(look.state.items.v0.image === refs[0] && look.state.items.v0.title === videos[0].title, "picture sits next to the item's own title");
+ok(look.questions.v0_look?.type === "score" && look.questions.v0_scam?.type === "noul" && !look.questions.v0_goal, "titled item: look + scam, no goal question (text pass covers it)");
+ok(look.questions.v1_goal?.type === "score", "picture-only post also gets a goal question");
+ok(!JSON.stringify(look).includes("https://"), "no image URL leaves the browser");
+
+const assets = toWire(look, "assets");
+ok(assets.assets[refs[0]].data_base64 === "AAAA" && assets.assets[refs[0]].format === "jpg" && assets.state.items.v0.image === refs[0], "TypeSafe direct: assets map keyed by the reference in state");
+ok(!("images" in assets), "TypeSafe direct: no stray images field");
+const dec = toWire(look, "decisions");
+ok(dec.state.items.v1.image.type === "image_url" && dec.state.items.v1.image.image_url.url === "data:image/jpeg;base64,BBBB", "OpenRouter Decisions: data-URL image part in place of the reference");
+ok(!("images" in dec) && !("assets" in dec) && !JSON.stringify(dec).includes("img-"), "OpenRouter Decisions: no references or assets left over");
+ok(look.state.items.v0.image === refs[0], "toWire leaves the built request untouched");
+ok(decisionsModel("jev-latest") === "~typesafe/jev-latest" && decisionsModel("jev-1.14.0") === "typesafe/jev-1.14" && decisionsModel("typesafe/jev-1.13") === "typesafe/jev-1.13", "model names mapped for the Decisions route");
+
+const lookAns = {
+  v0_look: { score: 2.6, confidence: 0.8 }, v0_scam: { noul: 0.1 },
+  v1_look: { score: 0.3, confidence: 0.9 }, v1_scam: { noul: 0.95 }, v1_goal: { score: 0.2, confidence: 0.9 },
+  v2_look: { score: 2.9, confidence: 0.2 }, v2_scam: { noul: 0.1 },
+};
+ok(lookVerdictFrom(lookAns, "v0", s, "m").tag === "CLICK-BAIT", "bait thumbnail + confidence -> CLICK-BAIT");
+ok(lookVerdictFrom(lookAns, "v1", s, "m").tag === "SPAM", "scam graphic -> SPAM");
+ok(lookVerdictFrom(lookAns, "v2", s, "m").tag === null, "bait thumbnail, low confidence -> fails open");
+
+const textOk = { tag: null, why: "", scores: { bait: 0.2 }, source: "jev" };
+const textBait = { tag: "CLICK-BAIT", why: "bait", scores: { bait: 2.8 }, source: "jev" };
+const picBait = lookVerdictFrom(lookAns, "v0", s, "m");
+const picOk = { tag: null, why: "", scores: { look: 0.1 }, source: "m" };
+ok(combine(textOk, picBait).tag === "CLICK-BAIT" && combine(textOk, picBait).scores.bait === 0.2, "picture can add a blur, and keeps the text scores");
+ok(combine(textBait, picOk).tag === "CLICK-BAIT" && combine(textBait, picOk).why === "bait", "picture never lifts a text blur");
+ok(combine(undefined, picBait) === picBait && combine(textOk, undefined) === textOk, "either side missing -> the other stands");
 
 console.log(fails ? "\n" + fails + " FAILED\n" : "\nall checks passed\n");
 process.exit(fails ? 1 : 0);

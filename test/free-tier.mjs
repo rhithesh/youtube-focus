@@ -6,6 +6,7 @@
 // Checks: the extension's own request goes through with the server's key; anything that
 // isn't that request shape is refused before it reaches Jev; per-install, per-IP, burst and
 // global limits; rejected or failed requests cost nothing; the Redis store keeps no raw IPs.
+// The image pass's route (/api/jev/look) gets the same treatment, with its own allowance.
 
 import { spawn, execFileSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -18,7 +19,7 @@ globalThis.chrome = {
   storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} }, onChanged: { addListener() {} } },
   runtime: { onMessage: { addListener() {} }, onInstalled: { addListener() {} }, openOptionsPage() {} },
 };
-const { buildRequest, DEFAULT_SETTINGS } = await import("../background.js");
+const { buildRequest, buildLookRequest, toWire, DEFAULT_SETTINGS } = await import("../background.js");
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const LANDING = join(HERE, "..", "landing");
@@ -41,6 +42,13 @@ const mock = createServer(async (req, res) => {
     const answers = {};
     for (const k of Object.keys(body.questions)) answers[k] = k.endsWith("_junk") ? { noul: 0.1 } : { score: 0.4, confidence: 0.9 };
     return void res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ answers, model: "jev-mock", usage: { prompt_tokens: 1 } }));
+  }
+  if (req.url === "/decisions") {
+    const body = JSON.parse(raw);
+    jevCalls.push({ auth: req.headers.authorization, body, route: "decisions" });
+    const answers = {};
+    for (const k of Object.keys(body.questions)) answers[k] = k.endsWith("_scam") ? { noul: 0.1 } : { score: 0.4, confidence: 0.9 };
+    return void res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ answers, model: "typesafe/jev-mock", usage: { input_tokens: 1 } }));
   }
   if (req.url === "/pipeline") {
     if (req.headers.authorization !== "Bearer redis-token") return void res.writeHead(401).end();
@@ -189,6 +197,45 @@ try {
   const keys = [...redis.keys()];
   ok(keys.length > 0 && keys.every((k) => !k.includes("203.0.113.50") && !k.includes("install-redis01")), "stored keys hold hashes, never raw IPs or install ids");
   ok([...redis.entries()].filter(([k]) => k.startsWith("ff:i:")).every(([, n]) => n === 20), "the rejected batch was rolled back in Redis (20, not 40)");
+
+  console.log("\n-- the image pass (/api/jev/look) --");
+  const LOOK_BASE = await serve(3205, {
+    OPENROUTER_API_KEY: "server-key",
+    JEV_LOOK_UPSTREAM_URL: MOCK + "/decisions",
+    FREE_INSTALL_IMAGES_PER_DAY: "15",
+  });
+  const LOOK = LOOK_BASE + "/look";
+  const jpeg = "/9j/" + "A".repeat(4000) + "==";
+  const pics = (n, prefix = "p") => items(n, prefix).map((v) => ({ ...v, imageData: jpeg }));
+  const lookBody = (n) => toWire(buildLookRequest(pics(n), s), "decisions");
+  const who = { install: "install-look0001", ip: "203.0.113.70" };
+
+  const l1 = await post(LOOK, lookBody(10), who);
+  const ld1 = await l1.json();
+  ok(l1.status === 200 && Object.keys(ld1.answers).length === 20, "10 pictures from buildLookRequest() → 200 with 20 answers");
+  const lcall = jevCalls.at(-1);
+  ok(lcall.route === "decisions" && lcall.auth === "Bearer server-key", "forwarded to the Decisions route with the server's key");
+  ok(lcall.body.model === "~typesafe/jev-latest" && Object.keys(lcall.body).sort().join() === "model,questions,state", "model is forced and nothing extra is forwarded");
+  ok(lcall.body.state.items.v0.image.image_url.url === "data:image/jpeg;base64," + jpeg, "the picture arrives intact");
+  ok(l1.headers.get("x-ratelimit-remaining") === "5" && l1.headers.get("x-ratelimit-limit") === "15", "pictures count against their own allowance: 5 of 15 left");
+  const gText = await (await fetch(LOOK_BASE, { headers: { "x-feed-filter-install": who.install, "x-forwarded-for": who.ip } })).json();
+  ok(gText.remaining === gText.limit && gText.limit > 0, "and the post allowance is untouched (" + gText.remaining + " of " + gText.limit + ")");
+  const lOver = await post(LOOK, lookBody(10), who);
+  ok(lOver.status === 429 && (await lOver.json()).scope === "install", "10 more pictures would pass 15 → 429 (install)");
+
+  const lBefore = jevCalls.length;
+  const bad = { install: "install-look0002", ip: "203.0.113.71" };
+  const mutate = (fn) => { const b = lookBody(2); fn(b); return b; };
+  ok((await post(LOOK, mutate((b) => (b.state.items.v0.image.image_url.url = "data:image/png;base64,iVBOR")), bad)).status === 400, "a PNG data URL → 400");
+  ok((await post(LOOK, mutate((b) => (b.state.items.v0.image.image_url.url = "https://example.com/a.jpg")), bad)).status === 400, "a remote image URL → 400");
+  ok((await post(LOOK, mutate((b) => (b.state.items.v0.image.detail = "high")), bad)).status === 400, "an image part with extra fields → 400");
+  ok((await post(LOOK, mutate((b) => delete b.state.items.v1.image), bad)).status === 400, "an item without a picture → 400");
+  ok((await post(LOOK, mutate((b) => (b.state.items.v0.image.image_url.url = "data:image/jpeg;base64," + "A".repeat(300_001))), bad)).status === 400, "a picture over 300K chars → 400");
+  ok((await post(LOOK, mutate((b) => (b.questions.v0_bait = b.questions.v0_look)), bad)).status === 400, "a text-pass question on the image route → 400");
+  ok((await post(LOOK, toWire(buildLookRequest(pics(11), s), "decisions"), bad)).status === 400, "11 pictures → 400");
+  ok((await post(LOOK, buildRequest(items(2), s), bad)).status === 400, "a text-pass request on the image route → 400");
+  ok((await post(LOOK, mutate((b) => (b.questions.v0_look.instructions.question = "x".repeat(5000))), bad)).status === 400, "an oversized question → 400");
+  ok(jevCalls.length === lBefore, "none of those reached Jev");
 
   const BAD = await serve(3204, { OPENROUTER_API_KEY: "server-key", UPSTASH_REDIS_REST_URL: MOCK, UPSTASH_REDIS_REST_TOKEN: "wrong" });
   const jevBefore = jevCalls.length;

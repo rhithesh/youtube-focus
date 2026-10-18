@@ -29,7 +29,10 @@ with the project's own key. It only accepts the exact request shape the extensio
 and limits by item: 300 per install per day, 1,000 per IP per day, 20 requests per IP per
 minute, and 20,000 across everyone per day (all overridable with `FREE_*` env vars).
 Rejected or failed requests aren't charged. When a limit is hit, keyword rules stand in
-and the tab asks again once `Retry-After` has passed. With your own key, requests go
+and the tab asks again once `Retry-After` has passed. Pictures go to
+`landing/src/app/api/jev/look/route.ts`, which takes only the image pass's request
+(JPEG data URLs, at most 10 per request) and has its own allowance: 300 pictures per
+install per day, 1,000 per IP, 20,000 across everyone. With your own key, requests go
 straight to OpenRouter or TypeSafe and never touch Feed Filter's server.
 
 Server setup (Vercel project env vars):
@@ -39,6 +42,7 @@ Server setup (Vercel project env vars):
 | `OPENROUTER_API_KEY` | required; without it the free tier answers 503 and the extension falls back to keyword rules |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_*`) | Upstash Redis, so limits hold across serverless instances; without it counters are per instance |
 | `FREE_INSTALL_ITEMS_PER_DAY`, `FREE_IP_ITEMS_PER_DAY`, `FREE_IP_REQUESTS_PER_MINUTE`, `FREE_GLOBAL_ITEMS_PER_DAY` | limits |
+| `FREE_INSTALL_IMAGES_PER_DAY`, `FREE_IP_IMAGES_PER_DAY`, `FREE_GLOBAL_IMAGES_PER_DAY` | picture limits |
 | `RATE_LIMIT_SALT` | salt for the hashed IPs and install ids in the counters |
 
 `node test/free-tier.mjs` builds the site and exercises the endpoint against a mock Jev.
@@ -77,6 +81,34 @@ found by testing: clickbait titles score 0.45–0.75 on the spam question becaus
 lower gate makes bait get tagged `SPAM`, which is the right call for the wrong
 reason. The displayed confidence is always the one belonging to the signal that
 decided — a `SPAM` verdict shows none, because nouls don't carry a confidence field.
+
+## Pictures (experimental)
+
+Turn on **Also judge thumbnails and post pictures** in settings (off by default) and a
+second pass looks at each item's picture: the YouTube thumbnail (`i.ytimg.com/vi/<id>/hqdefault.jpg`),
+or the first photo, video poster or link card on an X or LinkedIn post. It uses
+[Jev's image input](https://docs.typesafe.ai/images), new in Jev 1.14 and still marked
+experimental by TypeSafe.
+
+- **A separate request.** Any request with an image runs in Jev's long-context mode,
+  which TypeSafe says is slower and less accurate, so pictures never ride along with the
+  text batch. Text verdicts come back first; picture verdicts are pushed to the tab
+  when they land (up to 10 pictures per request) and cached under `i:<id>`.
+- **It can only add a blur.** The picture pass asks `vN_look` (a 4-level visual-bait
+  score: shocked faces, red arrows, huge overlay text, fake screenshots) and `vN_scam`
+  (a noul for scam graphics), gated by the same thresholds and minimum confidence.
+  A text verdict is never lifted by a picture.
+- **Picture-only posts.** X and LinkedIn posts with no text, skipped before, are judged
+  from the picture, with a `vN_goal` question added since the text pass never saw them.
+- **No new permissions.** The three image CDNs send `Access-Control-Allow-Origin: *`,
+  so the service worker loads pictures without extra host permissions. Each one is
+  re-encoded as a baseline JPEG, scaled to 280-768px a side (Jev takes 280-1568), and
+  only the picture is sent, never its URL.
+- **Where it goes.** OpenRouter takes images on its Decisions route
+  (`/api/alpha/decisions`) as `image_url` data-URL parts; TypeSafe direct takes them on
+  `/v1/systemone` as an `assets` map with the `TypeSafe-Danger-Zone-Images: true` header;
+  the free tier relays to OpenRouter's Decisions route. **Run a test call** in settings
+  sends one real thumbnail through whichever route you've picked.
 
 ## What a blocked item does
 
@@ -149,13 +181,15 @@ Run both before trusting a change to the veil behaviour or the question rubrics.
 
 ## Known limits
 
-- Jev is text-only, so thumbnails are never examined — a clean title over a
-  screaming thumbnail gets through.
+- Unless picture checks are on, thumbnails are never examined — a clean title over a
+  screaming thumbnail gets through. With them on, a picture's blur can land a beat
+  after the text verdicts, and Jev's image input is still experimental.
 - Hover-to-clear needs a pointer. On a touchscreen there is no hover state, so a
   tap goes straight through to the video.
 - Shorts are filtered as tiles in feeds and shelves. The immersive `/shorts/`
   swipe player is not covered.
-- X posts with no text (photo or video only) aren't judged.
+- X and LinkedIn posts with no text (photo or video only) are judged only with
+  picture checks on.
 - The X and LinkedIn adapters are written against those sites' current markup
   (`data-testid="tweet"`, `update-components-text`, …) and tested on fixture pages that
   copy it, not on a logged-in live feed. All three sites change their DOM often; if items

@@ -88,6 +88,16 @@ export const LIMITS = {
   globalPerDay: num(process.env.FREE_GLOBAL_ITEMS_PER_DAY, 20000),
 };
 
+// Pictures have an allowance of their own, so turning the image pass on doesn't eat into
+// the posts. The per-minute request limit is shared.
+export const IMAGE_LIMITS = {
+  installPerDay: num(process.env.FREE_INSTALL_IMAGES_PER_DAY, 300),
+  ipPerDay: num(process.env.FREE_IP_IMAGES_PER_DAY, 1000),
+  globalPerDay: num(process.env.FREE_GLOBAL_IMAGES_PER_DAY, 20000),
+};
+
+export type Kind = "text" | "image";
+
 // Raw IPs never reach the store.
 export function hashId(value: string) {
   return createHash("sha256")
@@ -116,17 +126,18 @@ export type Verdict =
  * Charge `items` against every limit at once. If any limit is exceeded the whole charge
  * is rolled back, so a rejected request costs the caller nothing.
  */
-export async function charge(ip: string, install: string, items: number): Promise<Verdict> {
+export async function charge(ip: string, install: string, items: number, kind: Kind = "text"): Promise<Verdict> {
   const s = getStore();
   const b = buckets();
   const ipId = hashId(ip);
   const dayTtl = b.secondsToMidnight + 60;
+  const [p, lim] = kind === "image" ? ["ff:p", IMAGE_LIMITS] : ["ff:", LIMITS];
 
   const entries = [
-    { scope: "install" as const, key: `ff:i:${b.day}:${hashId(install)}`, by: items, ttl: dayTtl, limit: LIMITS.installPerDay },
-    { scope: "ip" as const, key: `ff:ip:${b.day}:${ipId}`, by: items, ttl: dayTtl, limit: LIMITS.ipPerDay },
+    { scope: "install" as const, key: `${p}i:${b.day}:${hashId(install)}`, by: items, ttl: dayTtl, limit: lim.installPerDay },
+    { scope: "ip" as const, key: `${p}ip:${b.day}:${ipId}`, by: items, ttl: dayTtl, limit: lim.ipPerDay },
     { scope: "burst" as const, key: `ff:m:${b.minute}:${ipId}`, by: 1, ttl: 120, limit: LIMITS.ipRequestsPerMinute },
-    { scope: "global" as const, key: `ff:g:${b.day}`, by: items, ttl: dayTtl, limit: LIMITS.globalPerDay },
+    { scope: "global" as const, key: `${p}g:${b.day}`, by: items, ttl: dayTtl, limit: lim.globalPerDay },
   ];
 
   const totals = await s.incr(entries);
@@ -141,8 +152,8 @@ export async function charge(ip: string, install: string, items: number): Promis
 
   return {
     ok: true,
-    limit: LIMITS.installPerDay,
-    remaining: Math.max(0, LIMITS.installPerDay - totals[0]),
+    limit: lim.installPerDay,
+    remaining: Math.max(0, lim.installPerDay - totals[0]),
     resetSeconds: b.secondsToMidnight,
     refund,
   };

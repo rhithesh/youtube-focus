@@ -8,7 +8,7 @@ import { SITE } from "@/lib/site";
 // Linked from the Chrome Web Store listing. Keep it in step with the store's data-usage
 // disclosures and with what background.js and /api/jev actually send and keep.
 
-const UPDATED = "October 4, 2026";
+const UPDATED = "October 18, 2026";
 
 export const metadata: Metadata = {
   title: "Privacy policy",
@@ -45,7 +45,8 @@ export default function Privacy() {
         <p className="mt-4 text-[14px] text-muted">Last updated {UPDATED}</p>
         <p className="mt-8 text-[18px] leading-relaxed text-ink/80">
           This policy covers the {SITE.name} Chrome extension. In short: it reads the text of the posts in your YouTube, X and
-          LinkedIn feeds, sends that text and your goals to an AI model to judge them, and blurs the ones it flags. There are no
+          LinkedIn feeds (and their pictures, if you turn that on), sends them and your goals to an AI model to judge them, and
+          blurs the ones it flags. There are no
           accounts, no ads and no analytics, and your data is never sold.
         </p>
 
@@ -56,15 +57,21 @@ export default function Privacy() {
             post&apos;s reaction counts.
           </p>
           <p>
-            It does not read page addresses, your browsing history, your messages, your account details, or anything on any
-            other website.
+            If you turn on picture checks in settings (they&apos;re off by default), it also loads each item&apos;s thumbnail or
+            first picture from the site&apos;s own image server (i.ytimg.com, pbs.twimg.com or media.licdn.com): the same picture
+            your browser is already showing. It shrinks that picture and sends the copy to be judged. The picture&apos;s address
+            is used only to load it and is never sent.
+          </p>
+          <p>
+            It does not read your browsing history, your messages, your account details, or anything on any other website.
           </p>
         </Section>
 
-        <Section title="Where that text goes">
+        <Section title="Where it goes">
           <p>
             To judge each item, the extension sends batches of up to 20 items, together with the goals you wrote, to TypeSafe&apos;s
-            Jev model. Which way it goes depends on your setup:
+            Jev model. With picture checks on, pictures go in separate batches of up to 10, each next to its item&apos;s text.
+            Which way it goes depends on your setup:
           </p>
           <ul className="list-disc space-y-2 pl-5">
             <li>
@@ -83,8 +90,8 @@ export default function Privacy() {
 
         <Section title="What our free-tier server keeps">
           <p>
-            The free-tier server does not store or log the posts, titles or goals you send. To enforce the daily limit it keeps
-            only counters of how many items were judged, keyed by:
+            The free-tier server does not store or log the posts, titles, pictures or goals you send. To enforce the daily
+            limits it keeps only counters of how many items and pictures were judged, keyed by:
           </p>
           <ul className="list-disc space-y-2 pl-5">
             <li>a one-way hash of a random install ID the extension creates when you install it, and</li>

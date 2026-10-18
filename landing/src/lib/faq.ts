@@ -14,10 +14,10 @@ export const FAQS = [
   },
   {
     q: "Where do my posts and goals go?",
-    a: "On the free tier, the text of each post and your goals pass through Feed Filter’s server on their way to the model; nothing is stored or logged, only an anonymous daily counter. With your own key, they go straight from your browser to OpenRouter or TypeSafe and Feed Filter never sees them. Settings and keys live in your browser (chrome.storage.local).",
+    a: "On the free tier, the text of each post (plus a shrunk copy of its picture, if you turn picture checks on) and your goals pass through Feed Filter’s server on their way to the model; nothing is stored or logged, only an anonymous daily counter. With your own key, they go straight from your browser to OpenRouter or TypeSafe and Feed Filter never sees them. Settings and keys live in your browser (chrome.storage.local).",
   },
   {
     q: "What won’t it catch?",
-    a: "The model reads text, not images, so a calm title over a screaming thumbnail gets through, and X posts with no text aren’t judged. Hover needs a mouse. And all three sites change their pages often, so the extension may occasionally need an update.",
+    a: "Out of the box it reads text, not pictures, so a calm title over a screaming thumbnail gets through, and posts that are only a picture aren’t judged. Turn on picture checks in settings and Jev looks at thumbnails and post pictures too; it’s TypeSafe’s brand-new image input, so it’s off by default and labelled experimental. Hover needs a mouse. And all three sites change their pages often, so the extension may occasionally need an update.",
   },
 ];

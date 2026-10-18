@@ -1,7 +1,7 @@
 const $ = (sel) => document.querySelector(sel);
 
 const TEXT_FIELDS = ["goals", "apiKey", "model", "provider"];
-const CHECK_FIELDS = ["hideUntilChecked", "fallbackHeuristics", "showPagePill", "freeTier"];
+const CHECK_FIELDS = ["hideUntilChecked", "fallbackHeuristics", "showPagePill", "freeTier", "lookAtImages"];
 const SLIDERS = {
   baitThreshold: { out: "#baitOut", fmt: (v) => Number(v).toFixed(1) + " / 3" },
   offGoalThreshold: { out: "#offGoalOut", fmt: (v) => Number(v).toFixed(1) + " / 3" },
@@ -97,6 +97,15 @@ $("#test").addEventListener("click", async () => {
       (r.scores.conf == null ? "n/a (nouls carry none)" : Math.round(r.scores.conf * 100) + "%")
     );
     lines.push("");
+  }
+  const look = res.look;
+  if (look?.ok) {
+    const r = look.row;
+    lines.push("Image check OK in " + look.ms + "ms · model " + look.model, "usage: " + JSON.stringify(look.usage), "");
+    lines.push((r.tag ? "[" + r.tag + "]" : "[allowed] ") + "  thumbnail of: " + r.title);
+    lines.push("    thumbnail bait " + r.scores.look + "/3   scam " + Math.round(r.scores.scam * 100) + "%   confidence " + Math.round(r.scores.lookConf * 100) + "%");
+  } else if (look) {
+    lines.push("Image check FAILED" + (look.ms != null ? " after " + look.ms + "ms" : "") + ": " + look.error);
   }
   out.textContent = lines.join("\n");
   status("Test call succeeded.", "ok");

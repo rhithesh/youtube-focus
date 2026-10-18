@@ -40,6 +40,15 @@
   const MAX_POST_CHARS = 700;
   const clip = (s) => (s.length > MAX_POST_CHARS ? s.slice(0, MAX_POST_CHARS) + "…" : s);
 
+  // The item's picture, for the image pass. Only its address is collected here; the service
+  // worker loads it from the site's image server.
+  function mediaUrl(root, selectors) {
+    const m = root.querySelector(selectors);
+    const url = m?.getAttribute("poster") || m?.currentSrc || m?.getAttribute("src") || "";
+    return url.startsWith("https://") ? url : "";
+  }
+  const lookingAtImages = () => !!settings?.lookAtImages;
+
   /* ------------------------------------------------------------- sites */
 
   const youtube = {
@@ -95,6 +104,7 @@
         meta: [...el.querySelectorAll("#metadata-line span, .inline-metadata-item, .yt-content-metadata-view-model__metadata-text")]
           .map(text).filter(Boolean).slice(0, 4).join(" · "),
         isShort,
+        image: `https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg`, // 480x360 JPEG, there for every video
         surface: youtubeSurface(el, isShort),
       };
     },
@@ -122,19 +132,31 @@
       const body = richText(el.querySelector('[data-testid="tweetText"]'));
       const card = text(el.querySelector('[data-testid="card.wrapper"]'));
       const content = body || card;
-      if (!content) return null; // media-only post: nothing for a text model to judge
+      const image = xImage(el);
+      if (!content && !(image && lookingAtImages())) return null; // media-only post, and pictures aren't being judged
 
       const counts = el.querySelector('[role="group"][aria-label]')?.getAttribute("aria-label") || "";
       return {
         id: "x:" + m[1],
         platform: "x",
         title: clip(content),
+        image,
         author: text(el.querySelector('[data-testid="User-Name"]')),
         meta: [text(el.querySelector('[data-testid="socialContext"]')), counts].filter(Boolean).join(" · "),
         surface: "x",
       };
     },
   };
+
+  function xImage(el) {
+    const url = mediaUrl(el, '[data-testid="tweetPhoto"] img, [data-testid="videoPlayer"] video[poster], [data-testid="card.wrapper"] img');
+    // Ask X's image server for a small JPEG rather than WebP.
+    if (!url.startsWith("https://pbs.twimg.com/media/")) return url;
+    const u = new URL(url);
+    u.searchParams.set("format", "jpg");
+    u.searchParams.set("name", "small");
+    return u.href;
+  }
 
   const linkedin = {
     name: "linkedin",
@@ -154,12 +176,17 @@
       ).replace(/…\s*(see )?more$/i, "");
       const article = text(el.querySelector(".update-components-article__title"));
       const content = body || article;
-      if (!content) return null;
+      const image = mediaUrl(
+        el,
+        ".update-components-image img, img.update-components-article__image, .update-components-article img, .update-components-linkedin-video video[poster], .update-components-document__container img"
+      );
+      if (!content && !(image && lookingAtImages())) return null;
 
       return {
         id: "li:" + urn,
         platform: "linkedin",
         title: clip(content),
+        image,
         author: firstText(el, [".update-components-actor__title", ".update-components-actor__name", ".feed-shared-actor__name"])
           .split(/ • | · /)[0],
         meta: [
@@ -584,6 +611,12 @@
       if (msg?.type === "stats") {
         sendResponse({ blocked: blockedCount, judged: verdicts.size });
         return true;
+      }
+      // Picture verdicts arrive after the text ones, once the image pass finishes.
+      if (msg?.type === "verdicts") {
+        for (const [id, v] of Object.entries(msg.verdicts || {})) verdicts.set(id, v);
+        scan();
+        return false;
       }
       return false;
     });
