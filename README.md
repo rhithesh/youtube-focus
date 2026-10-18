@@ -15,7 +15,9 @@ typed answers with calibrated probabilities instead of prose.
 3. Reload any open YouTube, X or LinkedIn tab.
 
 To run from source instead: `chrome://extensions` → enable **Developer mode** →
-**Load unpacked** → pick this folder.
+**Load unpacked** → pick this folder. In Firefox (140 or later): `about:debugging` → **This
+Firefox** → **Load Temporary Add-on** → pick `manifest.json`. The same files and manifest
+work in both browsers.
 
 Turn filtering on or off from the toolbar popup, or from the small switch that floats
 on YouTube, X and LinkedIn pages (drag it anywhere; it remembers where). Hide that

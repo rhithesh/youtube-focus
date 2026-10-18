@@ -339,23 +339,38 @@
       button:focus-visible { outline: 2px solid #c9f25d; outline-offset: 2px; }
     `;
 
-    const LOGO = `<svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
-      <rect width="24" height="24" rx="12" fill="#2a2920"/>
-      <rect x="6" y="6.5" width="12" height="2.4" rx="1.2" fill="#c9f25d"/>
-      <rect x="6" y="10.8" width="12" height="2.4" rx="1.2" fill="#f3f0e8" opacity=".3"/>
-      <rect x="6" y="15.1" width="8" height="2.4" rx="1.2" fill="#c9f25d"/></svg>`;
+    // Built with DOM calls rather than markup strings, so no HTML is ever parsed into the page.
+    function el(tag, attrs = {}, kids = [], ns) {
+      const n = ns ? document.createElementNS(ns, tag) : document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+      n.append(...kids);
+      return n;
+    }
+
+    function logo() {
+      const SVG = "http://www.w3.org/2000/svg";
+      const bar = (y, w, fill, extra = {}) =>
+        el("rect", { x: "6", y, width: w, height: "2.4", rx: "1.2", fill, ...extra }, [], SVG);
+      return el("svg", { class: "logo", viewBox: "0 0 24 24", "aria-hidden": "true" }, [
+        el("rect", { width: "24", height: "24", rx: "12", fill: "#2a2920" }, [], SVG),
+        bar("6.5", "12", "#c9f25d"),
+        bar("10.8", "12", "#f3f0e8", { opacity: ".3" }),
+        bar("15.1", "8", "#c9f25d"),
+      ], SVG);
+    }
 
     function build() {
       host = document.createElement("div");
       host.setAttribute("data-ygf-pill", "");
       const root = host.attachShadow({ mode: "open" });
-      root.innerHTML = `<style>${CSS}</style>
-        <div class="pill" title="Feed Filter · drag to move">
-          ${LOGO}
-          <button role="switch" aria-label="Feed Filter"></button>
-          <span class="label"></span>
-          <span class="count" hidden></span>
-        </div>`;
+      const style = document.createElement("style");
+      style.textContent = CSS;
+      root.append(style, el("div", { class: "pill", title: "Feed Filter · drag to move" }, [
+        logo(),
+        el("button", { role: "switch", "aria-label": "Feed Filter" }),
+        el("span", { class: "label" }),
+        el("span", { class: "count", hidden: "" }),
+      ]));
       els = {
         pill: root.querySelector(".pill"),
         label: root.querySelector(".label"),

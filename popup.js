@@ -40,7 +40,9 @@ async function init() {
 }
 
 function showState(on) {
-  $("#state").innerHTML = on ? "Filter <em>on</em>" : "Filter <em>off</em>";
+  const em = document.createElement("em");
+  em.textContent = on ? "on" : "off";
+  $("#state").replaceChildren("Filter ", em);
 }
 
 function showNote(msg) {
