@@ -13,7 +13,7 @@
   <header>
     <p class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="7" fill="#16150f"/><rect x="6" y="6.5" width="12" height="2.4" rx="1.2" fill="#c9f25d"/><rect x="6" y="10.8" width="12" height="2.4" rx="1.2" fill="#f3f0e8" opacity=".28"/><rect x="6" y="15.1" width="8" height="2.4" rx="1.2" fill="#c9f25d"/></svg>Feed Filter</p>
     <h1>Your feeds, <em>minus the noise.</em></h1>
-    <p class="sub">YouTube videos, X posts and LinkedIn posts are judged by <a href="https://docs.typesafe.ai" target="_blank" rel="noreferrer">TypeSafe's Jev</a>, a System One model that returns typed, calibrated decisions instead of text. Anything flagged is blurred until you hover it.</p>
+    <p class="sub">YouTube videos, X posts and LinkedIn posts are judged by an AI model against the goals you write. Anything flagged is blurred until you hover it.</p>
   </header>
 
   <section id="welcome" hidden>
@@ -43,7 +43,7 @@
       </label>
       <label class="field">
         <span class="label">Model</span>
-        <input id="model" type="text" spellcheck="false" placeholder="jev-latest">
+        <input id="model" type="text" spellcheck="false" placeholder="Default (latest)">
       </label>
     </div>
     <label class="field">
@@ -51,7 +51,7 @@
       <input id="apiKey" type="password" spellcheck="false" autocomplete="off" placeholder="Leave empty to use the free tier">
       <span class="hint">Stored in this browser only (<code>chrome.storage.local</code>) and sent to the provider endpoint, nowhere else. Input is billed at $0.042 / Mtok; output is free. A full feed page costs a fraction of a cent.</span>
     </label>
-    <label class="check block"><input id="freeTier" type="checkbox"> Use the free tier when no key is set <span class="hint inline">(post text, your goals and, with picture checks on, the pictures pass through Feed Filter&rsquo;s server on the way to Jev; nothing is stored)</span></label>
+    <label class="check block"><input id="freeTier" type="checkbox"> Use the free tier when no key is set <span class="hint inline">(post text, your goals and, with picture checks on, the pictures pass through Feed Filter&rsquo;s server on the way to the model; nothing is stored)</span></label>
     <div class="row">
       <button id="test" class="btn">Run a test call</button>
       <label class="check"><input id="fallbackHeuristics" type="checkbox"> Fall back to keyword rules when the model can&rsquo;t be reached</label>
@@ -74,7 +74,7 @@
       <label class="check"><input type="checkbox" data-surface="linkedin"> LinkedIn feed</label>
     </div>
     <label class="check block"><input id="hideUntilChecked" type="checkbox"> Blur every item until it has been judged <span class="hint inline">(no flash of clickbait, but the feed fills in a beat slower)</span></label>
-    <label class="check block"><input id="lookAtImages" type="checkbox"> Also judge thumbnails and post pictures <span class="hint inline">(experimental: Jev&rsquo;s image input is new. Catches bait thumbnails, scam graphics and picture-only posts. Pictures are judged a moment after the text, so a blur can land a beat late.)</span></label>
+    <label class="check block"><input id="lookAtImages" type="checkbox"> Also judge thumbnails and post pictures <span class="hint inline">(experimental: picture judging is new. Catches bait thumbnails, scam graphics and picture-only posts. Pictures are judged a moment after the text, so a blur can land a beat late.)</span></label>
     <label class="check block"><input id="showPagePill" type="checkbox"> Show the on/off switch on the page <span class="hint inline">(a small pill on YouTube, X and LinkedIn; drag it anywhere)</span></label>
   </section>
 
@@ -111,7 +111,7 @@
     <label class="field slider">
       <span class="label">Minimum confidence <output id="confOut"></output><span class="scale">fail-open below this</span></span>
       <input id="minConfidence" type="range" min="0" max="0.95" step="0.05">
-      <span class="hint">Jev reports how certain it is separately from the answer. Below this, a tile is left alone even if the score crosses the line &mdash; raise it if you&rsquo;re seeing false blocks.</span>
+      <span class="hint">The model reports how certain it is separately from the answer. Below this, a tile is left alone even if the score crosses the line &mdash; raise it if you&rsquo;re seeing false blocks.</span>
     </label>
   </section>
 

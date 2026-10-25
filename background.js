@@ -434,7 +434,7 @@ async function callFree(body, endpoint = FREE_ENDPOINT) {
   }
   if (!res.ok) {
     const info = await res.json().catch(() => ({}));
-    const msg = info.error === "free-tier-off" ? "The free tier is switched off right now. Add your own key to keep using Jev." : "Free tier error " + res.status + ".";
+    const msg = info.error === "free-tier-off" ? "The free tier is switched off right now. Add your own key to keep filtering." : "Free tier error " + res.status + ".";
     throw new FreeTierError(msg, res.status === 503 ? retryAfter : 60);
   }
 

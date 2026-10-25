@@ -52,7 +52,7 @@ function RequestVisual() {
   return (
     <div ref={ref} className="flex h-full flex-col justify-center gap-2 p-5 font-mono text-[11.5px] leading-relaxed">
       <motion.p {...row(0)} className="text-paper/50">
-        POST /api/v1/systemone · 1 request
+        POST /judge · 1 request
       </motion.p>
       {SAMPLE_ANSWERS.map((a, i) => (
         <motion.div key={a.key} {...row(i + 1)} className="rounded-lg bg-night-2 p-2.5">
@@ -128,7 +128,7 @@ const STEPS = [
   },
   {
     title: "One request judges the page.",
-    body: "Every post becomes text and goes to TypeSafe’s Jev model at once: is it bait, is it on-goal, is it spam. About a second.",
+    body: "Every post becomes text and goes to the model at once: is it bait, is it on-goal, is it spam. About a second.",
     visual: <RequestVisual />,
     dark: true,
   },

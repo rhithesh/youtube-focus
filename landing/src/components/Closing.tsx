@@ -43,9 +43,6 @@ export function Footer() {
           <a href="https://github.com/rhithesh/youtube-focus" target="_blank" rel="noreferrer" className="hover:text-ink">
             GitHub
           </a>
-          <a href="https://docs.typesafe.ai" target="_blank" rel="noreferrer" className="hover:text-ink">
-            TypeSafe Jev
-          </a>
           <a href="/privacy" className="hover:text-ink">
             Privacy
           </a>

@@ -8,7 +8,7 @@ import { SITE } from "@/lib/site";
 // Linked from the Chrome Web Store listing. Keep it in step with the store's data-usage
 // disclosures and with what background.js and /api/jev actually send and keep.
 
-const UPDATED = "October 25, 2026";
+const UPDATED = "October 26, 2026";
 
 export const metadata: Metadata = {
   title: "Privacy policy",
@@ -69,8 +69,8 @@ export default function Privacy() {
 
         <Section title="Where it goes">
           <p>
-            To judge each item, the extension sends batches of up to 20 items, together with the goals you wrote, to TypeSafe&apos;s
-            Jev model. With picture checks on, pictures go in separate batches of up to 10, each next to its item&apos;s text.
+            To judge each item, the extension sends batches of up to 20 items, together with the goals you wrote, to an AI model
+            from TypeSafe. With picture checks on, pictures go in separate batches of up to 10, each next to its item&apos;s text.
             Which way it goes depends on your setup:
           </p>
           <ul className="list-disc space-y-2 pl-5">
@@ -81,7 +81,7 @@ export default function Privacy() {
             </li>
             <li>
               <strong className="font-medium text-ink">Without a key (the free tier):</strong> to our server at{" "}
-              <code className="font-mono text-[14px]">feed-filter-two.vercel.app</code>, which forwards it to Jev through
+              <code className="font-mono text-[14px]">feed-filter-two.vercel.app</code>, which forwards it to the model through
               OpenRouter using our own key and returns the answers.
             </li>
           </ul>

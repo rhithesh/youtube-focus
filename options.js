@@ -1,6 +1,7 @@
 const $ = (sel) => document.querySelector(sel);
 
 const TEXT_FIELDS = ["goals", "apiKey", "model", "provider"];
+const DEFAULT_MODEL = "jev-latest"; // shown as an empty "Default (latest)" field
 const CHECK_FIELDS = ["hideUntilChecked", "fallbackHeuristics", "showPagePill", "freeTier", "lookAtImages"];
 const SLIDERS = {
   baitThreshold: { out: "#baitOut", fmt: (v) => Number(v).toFixed(1) + " / 3" },
@@ -16,6 +17,7 @@ async function load() {
   settings = await chrome.runtime.sendMessage({ type: "settings" });
 
   for (const k of TEXT_FIELDS) $("#" + k).value = settings[k] ?? "";
+  if (settings.model === DEFAULT_MODEL) $("#model").value = "";
   for (const k of CHECK_FIELDS) $("#" + k).checked = !!settings[k];
   for (const k of Object.keys(SLIDERS)) {
     $("#" + k).value = settings[k];
@@ -42,7 +44,7 @@ function collect() {
   for (const k of Object.keys(SLIDERS)) next[k] = Number($("#" + k).value);
   next.surfaces = {};
   for (const box of document.querySelectorAll("[data-surface]")) next.surfaces[box.dataset.surface] = box.checked;
-  next.model = next.model || "jev-latest";
+  next.model = next.model || DEFAULT_MODEL;
   next.onboarded = true;
   return next;
 }
@@ -85,7 +87,7 @@ $("#test").addEventListener("click", async () => {
   }
 
   const lines = [
-    "OK in " + res.ms + "ms · model " + res.model,
+    "OK in " + res.ms + "ms",
     "usage: " + JSON.stringify(res.usage),
     "",
   ];
@@ -101,7 +103,7 @@ $("#test").addEventListener("click", async () => {
   const look = res.look;
   if (look?.ok) {
     const r = look.row;
-    lines.push("Image check OK in " + look.ms + "ms · model " + look.model, "usage: " + JSON.stringify(look.usage), "");
+    lines.push("Image check OK in " + look.ms + "ms", "usage: " + JSON.stringify(look.usage), "");
     lines.push((r.tag ? "[" + r.tag + "]" : "[allowed] ") + "  thumbnail of: " + r.title);
     lines.push("    thumbnail bait " + r.scores.look + "/3   scam " + Math.round(r.scores.scam * 100) + "%   confidence " + Math.round(r.scores.lookConf * 100) + "%");
   } else if (look) {

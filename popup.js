@@ -25,7 +25,7 @@ async function init() {
     else if (freePausedUntil && Date.now() < freePausedUntil && recentError) show(lastError.msg);
     else if (usedToday)
       showNote(`Free tier · ${freeUsage.remaining} of ${freeUsage.limit} posts left today.`);
-    else showNote("Free · judged by Jev, no daily limit.");
+    else showNote("Free · no daily limit.");
   } else if (recentError) {
     show(lastError.msg);
   }

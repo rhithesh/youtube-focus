@@ -18,6 +18,6 @@ export const FAQS = [
   },
   {
     q: "What won’t it catch?",
-    a: "Out of the box it reads text, not pictures, so a calm title over a screaming thumbnail gets through, and posts that are only a picture aren’t judged. Turn on picture checks in settings and Jev looks at thumbnails and post pictures too; it’s TypeSafe’s brand-new image input, so it’s off by default and labelled experimental. Hover needs a mouse. And all three sites change their pages often, so the extension may occasionally need an update.",
+    a: "Out of the box it reads text, not pictures, so a calm title over a screaming thumbnail gets through, and posts that are only a picture aren’t judged. Turn on picture checks in settings and the model looks at thumbnails and post pictures too; picture judging is brand new, so it’s off by default and labelled experimental. Hover needs a mouse. And all three sites change their pages often, so the extension may occasionally need an update.",
   },
 ];
