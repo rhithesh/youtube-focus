@@ -85,9 +85,9 @@ export async function relay(
   }
 
   const data = (await upstream.json()) as { answers?: unknown; model?: string; usage?: unknown };
-  return json({ answers: data.answers ?? {}, model: data.model ?? v.body.model, usage: data.usage }, 200, {
-    "X-RateLimit-Limit": String(bill.limit),
-    "X-RateLimit-Remaining": String(bill.remaining),
-    "X-RateLimit-Reset": String(bill.resetSeconds),
-  });
+  // Allowance headers only when there is a per-install allowance to report.
+  const allowance: Record<string, string> = Number.isFinite(bill.limit)
+    ? { "X-RateLimit-Limit": String(bill.limit), "X-RateLimit-Remaining": String(bill.remaining), "X-RateLimit-Reset": String(bill.resetSeconds) }
+    : {};
+  return json({ answers: data.answers ?? {}, model: data.model ?? v.body.model, usage: data.usage }, 200, allowance);
 }

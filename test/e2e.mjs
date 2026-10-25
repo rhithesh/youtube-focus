@@ -88,7 +88,8 @@ function freeTier(req, res, raw) {
     answers[k + "_goal"] = { score: 0.5, confidence: 0.9 };
     answers[k + "_junk"] = { noul: /airdrop|passive income/i.test(t) ? 0.97 : 0.03 };
   }
-  res.writeHead(200, { "content-type": "application/json", "x-ratelimit-limit": "300", "x-ratelimit-remaining": String(300 - freeCalls.length) })
+  // Like the live server: no per-install allowance, so no allowance headers.
+  res.writeHead(200, { "content-type": "application/json" })
     .end(JSON.stringify({ answers, model: "jev-free-mock" }));
 }
 
@@ -228,7 +229,7 @@ try {
     check(judged, "after the 429 and its Retry-After, all judged items were re-asked and cached from the free tier (8 items)");
     const st = await evaluate(`chrome.storage.local.get(["freeUsage", "freePausedUntil"])`, swSession);
     check(st.freePausedUntil > 0, "the 429 paused free calls (freePausedUntil was set)");
-    check(st.freeUsage?.limit === 300 && st.freeUsage.remaining < 300, `remaining allowance is tracked for the popup (${st.freeUsage?.remaining} of ${st.freeUsage?.limit})`);
+    check(!st.freeUsage, "once answers come back with no allowance headers (no daily limit), no allowance is tracked");
     check(freeCalls[0].items > 1 && freeCalls[1]?.items === 1,
       `after a batch didn't fit in the 1 post left, the next one asked about only 1 (${freeCalls[0].items} → ${freeCalls[1]?.items})`);
   }

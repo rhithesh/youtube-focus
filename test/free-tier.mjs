@@ -221,7 +221,16 @@ try {
   ok(lcall.body.state.items.v0.image.image_url.url === "data:image/jpeg;base64," + jpeg, "the picture arrives intact");
   ok(l1.headers.get("x-ratelimit-remaining") === "5" && l1.headers.get("x-ratelimit-limit") === "15", "pictures count against their own allowance: 5 of 15 left");
   const gText = await (await fetch(LOOK_BASE, { headers: { "x-feed-filter-install": who.install, "x-forwarded-for": who.ip } })).json();
-  ok(gText.remaining === gText.limit && gText.limit > 0, "and the post allowance is untouched (" + gText.remaining + " of " + gText.limit + ")");
+  ok(gText.used === 0, "and pictures don't count as posts (" + gText.used + " posts used)");
+
+  console.log("\n-- default limits: free, no per-install daily limit --");
+  ok(gText.limit === null && gText.remaining === null, "GET reports no per-install limit");
+  let lastText;
+  for (let i = 0; i < 20; i++) lastText = await post(LOOK_BASE, buildRequest(items(20, "d" + i), s), { install: "install-heavy001", ip: "203.0.113.80" });
+  ok(lastText.status === 200, "400 posts in a day from one install (past the old 300 limit) → still 200");
+  ok(lastText.headers.get("x-ratelimit-limit") === null && lastText.headers.get("x-ratelimit-remaining") === null, "no allowance headers when there is no allowance");
+  const gHeavy = await (await fetch(LOOK_BASE, { headers: { "x-feed-filter-install": "install-heavy001", "x-forwarded-for": "203.0.113.80" } })).json();
+  ok(gHeavy.used === 400 && gHeavy.limit === null, "usage is still counted (" + gHeavy.used + "), only not capped");
   const lOver = await post(LOOK, lookBody(10), who);
   ok(lOver.status === 429 && (await lOver.json()).scope === "install", "10 more pictures would pass 15 → 429 (install)");
 

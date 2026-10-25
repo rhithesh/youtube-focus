@@ -80,20 +80,22 @@ export function getStore(): Store {
 
 const num = (v: string | undefined, d: number) => (v && Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : d);
 
+// The free tier is free with no per-user daily limit. What's left is abuse protection: a per-IP
+// ceiling no one person reaches (high, since mobile carriers put many people behind one IP), a
+// per-minute request limit, and a global daily ceiling that caps the spend on our key.
 // Items are the unit: one feed post = 3 questions ≈ $0.00003 of Jev input.
 export const LIMITS = {
-  installPerDay: num(process.env.FREE_INSTALL_ITEMS_PER_DAY, 300),
-  ipPerDay: num(process.env.FREE_IP_ITEMS_PER_DAY, 1000),
-  ipRequestsPerMinute: num(process.env.FREE_IP_REQUESTS_PER_MINUTE, 20),
-  globalPerDay: num(process.env.FREE_GLOBAL_ITEMS_PER_DAY, 20000),
+  installPerDay: num(process.env.FREE_INSTALL_ITEMS_PER_DAY, Infinity),
+  ipPerDay: num(process.env.FREE_IP_ITEMS_PER_DAY, 20_000),
+  ipRequestsPerMinute: num(process.env.FREE_IP_REQUESTS_PER_MINUTE, 60),
+  globalPerDay: num(process.env.FREE_GLOBAL_ITEMS_PER_DAY, 100_000), // ≈ $3/day at most
 };
 
-// Pictures have an allowance of their own, so turning the image pass on doesn't eat into
-// the posts. The per-minute request limit is shared.
+// Pictures are counted separately (≈ $0.00004 each). The per-minute request limit is shared.
 export const IMAGE_LIMITS = {
-  installPerDay: num(process.env.FREE_INSTALL_IMAGES_PER_DAY, 300),
-  ipPerDay: num(process.env.FREE_IP_IMAGES_PER_DAY, 1000),
-  globalPerDay: num(process.env.FREE_GLOBAL_IMAGES_PER_DAY, 20000),
+  installPerDay: num(process.env.FREE_INSTALL_IMAGES_PER_DAY, Infinity),
+  ipPerDay: num(process.env.FREE_IP_IMAGES_PER_DAY, 3_000),
+  globalPerDay: num(process.env.FREE_GLOBAL_IMAGES_PER_DAY, 25_000), // ≈ $1/day at most
 };
 
 export type Kind = "text" | "image";
@@ -165,5 +167,7 @@ export async function charge(ip: string, install: string, items: number, kind: K
 export async function peek(install: string) {
   const b = buckets();
   const [used] = await getStore().get([`ff:i:${b.day}:${hashId(install)}`]);
-  return { limit: LIMITS.installPerDay, remaining: Math.max(0, LIMITS.installPerDay - used), resetSeconds: b.secondsToMidnight };
+  const limit = LIMITS.installPerDay;
+  if (!Number.isFinite(limit)) return { limit: null, remaining: null, used, resetSeconds: b.secondsToMidnight }; // no per-install limit
+  return { limit, remaining: Math.max(0, limit - used), used, resetSeconds: b.secondsToMidnight };
 }

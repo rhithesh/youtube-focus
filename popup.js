@@ -21,11 +21,11 @@ async function init() {
     const reset = new Date(today + "T00:00:00Z").getTime() + 864e5;
     const at = (t) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     if (usedToday && freeUsage.remaining === 0)
-      show(`Free tier used up for today: keyword rules only until ${at(reset)}. Add your own key in settings for unlimited.`);
+      show(`Free tier used up for today: keyword rules only until ${at(reset)}.`);
     else if (freePausedUntil && Date.now() < freePausedUntil && recentError) show(lastError.msg);
     else if (usedToday)
       showNote(`Free tier · ${freeUsage.remaining} of ${freeUsage.limit} posts left today.`);
-    else showNote("Free tier. Add your own key in settings for unlimited.");
+    else showNote("Free · judged by Jev, no daily limit.");
   } else if (recentError) {
     show(lastError.msg);
   }

@@ -34,7 +34,7 @@ export function StructuredData() {
           "Blurs clickbait, spam and off-goal posts on YouTube, X (Twitter) and LinkedIn",
           "Judged against goals you write in plain words",
           "Hover any blurred post to see it anyway",
-          "Free tier, or bring your own OpenRouter key",
+          "Free with no daily limit, or bring your own OpenRouter key",
           "On/off switch on the page",
         ],
         author: { "@type": "Person", name: SITE.author.name, url: SITE.author.url },

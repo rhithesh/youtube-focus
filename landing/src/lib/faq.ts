@@ -10,7 +10,7 @@ export const FAQS = [
   },
   {
     q: "What does it cost?",
-    a: "Nothing, to start. Without a key, Feed Filter’s free tier judges up to 300 posts a day, and verdicts are cached for a week so scrolling back past something doesn’t count again. Want unlimited? Bring your own OpenRouter key: about $0.0003 for a page of ten posts. If the free tier is ever used up, keyword rules keep catching the obvious bait until it resets.",
+    a: "Nothing. Without a key, Feed Filter judges your posts for free, with no daily limit. You can also bring your own OpenRouter key, so your posts go straight to the model instead of through Feed Filter’s server: about $0.0003 for a page of ten posts. If the free tier is ever too busy, keyword rules keep catching the obvious bait until it’s back.",
   },
   {
     q: "Where do my posts and goals go?",

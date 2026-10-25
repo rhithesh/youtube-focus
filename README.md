@@ -28,13 +28,16 @@ switch under **Where to filter → Show the on/off switch on the page**.
 With no key set, the extension sends the same request to Feed Filter's free tier
 (`landing/src/app/api/jev/route.ts`, deployed with the site), which forwards it to Jev
 with the project's own key. It only accepts the exact request shape the extension builds,
-and limits by item: 300 per install per day, 1,000 per IP per day, 20 requests per IP per
-minute, and 20,000 across everyone per day (all overridable with `FREE_*` env vars).
+and is free with no per-user daily limit. What's left guards against abuse and caps the
+spend on the project's key: 20,000 posts per IP per day (high, because mobile carriers put
+many people behind one IP), 60 requests per IP per minute, and 100,000 posts across
+everyone per day, about $3 of Jev at most. All are overridable with `FREE_*` env vars,
+and setting `FREE_INSTALL_ITEMS_PER_DAY` brings back a per-install allowance.
 Rejected or failed requests aren't charged. When a limit is hit, keyword rules stand in
 and the tab asks again once `Retry-After` has passed. Pictures go to
 `landing/src/app/api/jev/look/route.ts`, which takes only the image pass's request
-(JPEG data URLs, at most 10 per request) and has its own allowance: 300 pictures per
-install per day, 1,000 per IP, 20,000 across everyone. With your own key, requests go
+(JPEG data URLs, at most 10 per request) and is counted separately: 3,000 pictures per
+IP per day and 25,000 across everyone, about $1 at most. With your own key, requests go
 straight to OpenRouter or TypeSafe and never touch Feed Filter's server.
 
 Server setup (Vercel project env vars):

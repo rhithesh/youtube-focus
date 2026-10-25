@@ -424,9 +424,12 @@ async function callFree(body, endpoint = FREE_ENDPOINT) {
       await chrome.storage.local.set({ freeUsage: { limit: info.limit, remaining: info.remaining, at: Date.now() } });
       if (info.remaining > 0) throw new FreeTierError(`Free tier: only ${info.remaining} posts left today, asking about fewer at a time.`, 5);
     }
-    const msg = info.scope === "burst"
-      ? "Free tier: too many requests, slowing down for a minute."
-      : "Free tier: today's limit is used up. Keyword rules until it resets; add your own key for unlimited.";
+    const msg = {
+      burst: "Free tier: too many requests, slowing down for a minute.",
+      install: "Free tier: today's limit is used up. Keyword rules until it resets.",
+      ip: "Free tier: too many posts from your network today. Keyword rules until it resets.",
+      global: "Free tier: at capacity for today. Keyword rules until it resets.",
+    }[info.scope] || "Free tier: limit reached. Keyword rules until it resets.";
     throw new FreeTierError(msg, retryAfter);
   }
   if (!res.ok) {
@@ -435,10 +438,13 @@ async function callFree(body, endpoint = FREE_ENDPOINT) {
     throw new FreeTierError(msg, res.status === 503 ? retryAfter : 60);
   }
 
-  const limit = Number(res.headers.get("x-ratelimit-limit"));
-  const remaining = Number(res.headers.get("x-ratelimit-remaining"));
-  if (endpoint === FREE_ENDPOINT && Number.isFinite(limit) && Number.isFinite(remaining)) {
-    await chrome.storage.local.set({ freeUsage: { limit, remaining, at: Date.now() } });
+  // The free tier has no per-install allowance by default, and then sends no allowance headers.
+  if (endpoint === FREE_ENDPOINT) {
+    const header = (name) => (res.headers.has(name) ? Number(res.headers.get(name)) : NaN);
+    const limit = header("x-ratelimit-limit");
+    const remaining = header("x-ratelimit-remaining");
+    if (Number.isFinite(limit) && Number.isFinite(remaining)) await chrome.storage.local.set({ freeUsage: { limit, remaining, at: Date.now() } });
+    else await chrome.storage.local.remove("freeUsage");
   }
   return res.json();
 }
@@ -790,8 +796,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
-  // An older version may have paused the free tier until the reset with posts still left.
-  if (reason === "update") await chrome.storage.local.remove("freePausedUntil");
+  // The free tier no longer has a per-install daily limit: drop any pause or count left behind.
+  if (reason === "update") await chrome.storage.local.remove(["freePausedUntil", "freeUsage"]);
   if (reason !== "install") return;
   await chrome.storage.local.set({ settings: { ...DEFAULT_SETTINGS } });
   chrome.runtime.openOptionsPage();

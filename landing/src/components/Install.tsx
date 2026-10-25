@@ -20,8 +20,8 @@ export function Install() {
             One click. Then <Mark>forget</Mark> it&rsquo;s there.
           </h2>
           <p className="mt-6 max-w-[440px] text-[17px] leading-relaxed text-muted">
-            Works in Chrome, Brave, Edge, Arc and any other Chromium browser. No key needed: the free tier
-            judges up to 300 posts a day. Add your own OpenRouter key any time for unlimited.
+            Works in Chrome, Brave, Edge, Arc and any other Chromium browser. Free, with no key and no
+            daily limit. Prefer your posts to skip our server? Add your own OpenRouter key.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a href={SITE.store} target="_blank" rel="noreferrer" className={btn.ink}>

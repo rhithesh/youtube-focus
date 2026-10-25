@@ -8,7 +8,7 @@ import { SITE } from "@/lib/site";
 // Linked from the Chrome Web Store listing. Keep it in step with the store's data-usage
 // disclosures and with what background.js and /api/jev actually send and keep.
 
-const UPDATED = "October 18, 2026";
+const UPDATED = "October 25, 2026";
 
 export const metadata: Metadata = {
   title: "Privacy policy",
@@ -90,8 +90,8 @@ export default function Privacy() {
 
         <Section title="What our free-tier server keeps">
           <p>
-            The free-tier server does not store or log the posts, titles, pictures or goals you send. To enforce the daily
-            limits it keeps only counters of how many items and pictures were judged, keyed by:
+            The free-tier server does not store or log the posts, titles, pictures or goals you send. To guard against abuse
+            it keeps only counters of how many items and pictures were judged, keyed by:
           </p>
           <ul className="list-disc space-y-2 pl-5">
             <li>a one-way hash of a random install ID the extension creates when you install it, and</li>
