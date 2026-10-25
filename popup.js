@@ -17,8 +17,13 @@ async function init() {
       : "No API key and the free tier is off. Nothing is being filtered.");
   } else if (!settings.apiKey) {
     const today = new Date().toISOString().slice(0, 10);
-    if (freePausedUntil && Date.now() < freePausedUntil && recentError) show(lastError.msg);
-    else if (freeUsage && new Date(freeUsage.at).toISOString().slice(0, 10) === today)
+    const usedToday = freeUsage && new Date(freeUsage.at).toISOString().slice(0, 10) === today;
+    const reset = new Date(today + "T00:00:00Z").getTime() + 864e5;
+    const at = (t) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    if (usedToday && freeUsage.remaining === 0)
+      show(`Free tier used up for today: keyword rules only until ${at(reset)}. Add your own key in settings for unlimited.`);
+    else if (freePausedUntil && Date.now() < freePausedUntil && recentError) show(lastError.msg);
+    else if (usedToday)
       showNote(`Free tier · ${freeUsage.remaining} of ${freeUsage.limit} posts left today.`);
     else showNote("Free tier. Add your own key in settings for unlimited.");
   } else if (recentError) {

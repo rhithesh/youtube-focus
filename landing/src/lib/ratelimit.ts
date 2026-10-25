@@ -120,7 +120,7 @@ function buckets(now = Date.now()) {
 
 export type Verdict =
   | { ok: true; remaining: number; limit: number; resetSeconds: number; refund: () => Promise<void> }
-  | { ok: false; scope: "install" | "ip" | "burst" | "global"; retryAfter: number; limit: number };
+  | { ok: false; scope: "install" | "ip" | "burst" | "global"; retryAfter: number; limit: number; remaining: number };
 
 /**
  * Charge `items` against every limit at once. If any limit is exceeded the whole charge
@@ -147,7 +147,9 @@ export async function charge(ip: string, install: string, items: number, kind: K
   if (over !== -1) {
     await refund();
     const e = entries[over];
-    return { ok: false, scope: e.scope, limit: e.limit, retryAfter: e.scope === "burst" ? b.secondsToNextMinute : b.secondsToMidnight };
+    // What was left before this charge, so the caller can retry with a smaller batch.
+    const remaining = Math.max(0, e.limit - (totals[over] - e.by));
+    return { ok: false, scope: e.scope, limit: e.limit, remaining, retryAfter: e.scope === "burst" ? b.secondsToNextMinute : b.secondsToMidnight };
   }
 
   return {

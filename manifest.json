@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Feed Filter — goal-aligned feeds",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Blurs clickbait, spam and off-goal posts on YouTube, X and LinkedIn, judged against goals you write, using TypeSafe's Jev.",
   "permissions": ["storage"],
   "host_permissions": [

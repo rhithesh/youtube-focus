@@ -388,6 +388,20 @@ async function installId() {
   return id;
 }
 
+// The free tier's day, like its counters, runs midnight to midnight UTC.
+const utcDay = (t) => new Date(t).toISOString().slice(0, 10);
+const nextUtcMidnight = () => {
+  const d = new Date();
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+};
+
+/** Posts this install can still send today, or Infinity when not known yet. */
+async function freeLeftToday() {
+  const { freeUsage } = await chrome.storage.local.get("freeUsage");
+  if (!freeUsage || utcDay(freeUsage.at) !== utcDay(Date.now()) || !Number.isFinite(freeUsage.remaining)) return Infinity;
+  return Math.max(0, freeUsage.remaining);
+}
+
 // The free tier's own limits are final: no retrying a 429 from it, just back off until it resets.
 async function callFree(body, endpoint = FREE_ENDPOINT) {
   let res;
@@ -404,6 +418,12 @@ async function callFree(body, endpoint = FREE_ENDPOINT) {
   const retryAfter = Number(res.headers.get("retry-after")) || 60;
   if (res.status === 429) {
     const info = await res.json().catch(() => ({}));
+    // Over this install's allowance: note what's left. If the batch just didn't fit, try a
+    // smaller one in a few seconds instead of waiting for the reset.
+    if (info.scope === "install" && Number.isFinite(info.remaining) && endpoint === FREE_ENDPOINT) {
+      await chrome.storage.local.set({ freeUsage: { limit: info.limit, remaining: info.remaining, at: Date.now() } });
+      if (info.remaining > 0) throw new FreeTierError(`Free tier: only ${info.remaining} posts left today, asking about fewer at a time.`, 5);
+    }
     const msg = info.scope === "burst"
       ? "Free tier: too many requests, slowing down for a minute."
       : "Free tier: today's limit is used up. Keyword rules until it resets; add your own key for unlimited.";
@@ -575,12 +595,27 @@ async function judgeText(videos, s) {
       return { verdicts: heuristicsFor(todo, {}, freePausedUntil), settings: s, degraded: "free-paused" };
   }
 
+  // The free tier refuses a whole batch that doesn't fit in what's left today, so near the
+  // limit ask about only as many posts as remain; the rest get keyword rules for now.
+  let ask = todo;
+  if (!s.apiKey) {
+    const left = await freeLeftToday();
+    if (left === 0) {
+      const reset = nextUtcMidnight();
+      await chrome.storage.local.set({ freePausedUntil: reset });
+      return { verdicts: heuristicsFor(todo, {}, reset), settings: s, degraded: "free-paused" };
+    }
+    if (left < todo.length) ask = todo.slice(0, left);
+  }
+
   const chunks = [];
-  for (let i = 0; i < todo.length; i += BATCH_SIZE) chunks.push(todo.slice(i, i + BATCH_SIZE));
+  for (let i = 0; i < ask.length; i += BATCH_SIZE) chunks.push(ask.slice(i, i + BATCH_SIZE));
 
   const fresh = {};
   let error = null;
-  let retryAt = Date.now() + 60_000;
+  // Posts left out above are asked about again soon: by then the allowance is either known
+  // to be 0 (and the free tier pauses until the reset) or turned out to be larger.
+  let retryAt = Date.now() + (ask.length < todo.length ? 5_000 : 60_000);
 
   for (let i = 0; i < chunks.length; i += MAX_PARALLEL) {
     const slice = chunks.slice(i, i + MAX_PARALLEL);
@@ -755,6 +790,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
+  // An older version may have paused the free tier until the reset with posts still left.
+  if (reason === "update") await chrome.storage.local.remove("freePausedUntil");
   if (reason !== "install") return;
   await chrome.storage.local.set({ settings: { ...DEFAULT_SETTINGS } });
   chrome.runtime.openOptionsPage();

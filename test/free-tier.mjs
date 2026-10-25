@@ -150,8 +150,10 @@ try {
   const overBody = await over.json();
   ok(over.status === 429 && overBody.scope === "install", "third batch would pass 50 → 429 (install)");
   ok(Number(over.headers.get("retry-after")) > 0, "429 carries Retry-After (" + over.headers.get("retry-after") + "s)");
+  ok(overBody.remaining === 10, "429 says how many items are still left (" + overBody.remaining + ")");
   ok((await post(API, buildRequest(items(10), s))).status === 200, "a 10-item batch still fits exactly → 200");
-  ok((await post(API, buildRequest(items(1), s))).status === 429, "then even 1 item → 429");
+  const spent = await post(API, buildRequest(items(1), s));
+  ok(spent.status === 429 && (await spent.json()).remaining === 0, "then even 1 item → 429, with 0 left");
   ok((await post(API, buildRequest(items(10), s), { install: "install-cccccccc" })).status === 200, "a different install on the same IP still works");
 
   console.log("\n-- per-IP daily limit (shared NAT, many installs) --");

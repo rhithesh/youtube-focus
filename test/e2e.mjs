@@ -72,12 +72,13 @@ function freeLook(req, res, raw) {
   res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ answers, model: "jev-look-mock" }));
 }
 
-// Stand-in for landing/src/app/api/jev: the first call is over the limit, the rest get answers.
+// Stand-in for landing/src/app/api/jev: the first call doesn't fit in what's left (1 post),
+// the rest get answers.
 function freeTier(req, res, raw) {
   const body = JSON.parse(raw);
   freeCalls.push({ install: req.headers["x-feed-filter-install"], auth: req.headers.authorization, items: Object.keys(body.state.items).length });
   if (freeCalls.length === 1) {
-    res.writeHead(429, { "content-type": "application/json", "retry-after": "2" }).end(JSON.stringify({ error: "limit", scope: "install", limit: 300, retryAfter: 2 }));
+    res.writeHead(429, { "content-type": "application/json", "retry-after": "2" }).end(JSON.stringify({ error: "limit", scope: "install", limit: 300, remaining: 1, retryAfter: 2 }));
     return;
   }
   const answers = {};
@@ -228,6 +229,8 @@ try {
     const st = await evaluate(`chrome.storage.local.get(["freeUsage", "freePausedUntil"])`, swSession);
     check(st.freePausedUntil > 0, "the 429 paused free calls (freePausedUntil was set)");
     check(st.freeUsage?.limit === 300 && st.freeUsage.remaining < 300, `remaining allowance is tracked for the popup (${st.freeUsage?.remaining} of ${st.freeUsage?.limit})`);
+    check(freeCalls[0].items > 1 && freeCalls[1]?.items === 1,
+      `after a batch didn't fit in the 1 post left, the next one asked about only 1 (${freeCalls[0].items} → ${freeCalls[1]?.items})`);
   }
 
   console.log("\n-- hover on x.com --");

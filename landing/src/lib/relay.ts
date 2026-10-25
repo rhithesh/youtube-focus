@@ -50,7 +50,7 @@ export async function relay(
   }
   if (!bill.ok) {
     return json(
-      { error: "limit", scope: bill.scope, limit: bill.limit, retryAfter: bill.retryAfter },
+      { error: "limit", scope: bill.scope, limit: bill.limit, remaining: bill.remaining, retryAfter: bill.retryAfter },
       429,
       { "Retry-After": String(bill.retryAfter) }
     );
